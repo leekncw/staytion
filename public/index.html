@@ -20,7 +20,7 @@
     --accent-2:#ff8a4c;
     --accent-dim:#7a2c10;
     --accent-glow:rgba(255,90,31,.35);
-    --live-red:#ff3b5c;
+    --error-red:#ff3b5c;
     --font-display:'Space Grotesk',sans-serif;
     --font-body:'Inter',sans-serif;
     --font-mono:'Space Mono',monospace;
@@ -135,7 +135,7 @@
   .field input{ flex:1; font-size:14px; }
   .field-hint{ font-family:var(--font-mono); font-size:10.5px; margin-top:6px; color:var(--text-faint); letter-spacing:.3px; }
   .field-hint.ok{ color:#4ade80; }
-  .field-hint.err{ color:var(--live-red); }
+  .field-hint.err{ color:var(--error-red); }
 
   .btn-primary{
     width:100%; padding:13px; background:var(--accent); color:#0a0a0b;
@@ -272,16 +272,6 @@
     padding:5px 12px; text-transform:uppercase; letter-spacing:.5px;
   }
   .btn-follow:hover{ background:var(--accent); color:#0a0a0b; }
-  .live-mini{ padding:11px 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border); }
-  .live-mini:last-child{ border-bottom:none; }
-  .live-mini .thumb{ width:52px; height:38px; flex-shrink:0; position:relative; overflow:hidden; }
-  .live-badge{
-    position:absolute; top:3px; left:3px; background:var(--live-red); color:#fff; font-family:var(--font-mono);
-    font-size:8px; font-weight:700; padding:1px 4px; letter-spacing:.5px;
-  }
-  .live-mini .ln{ font-size:12.5px; font-weight:700; }
-  .live-mini .lv{ font-size:11px; color:var(--text-faint); font-family:var(--font-mono); }
-
   /* ============ SEARCH VIEW ============ */
   .search-hero{ padding:20px 24px; border-bottom:1px solid var(--border); }
   .chip-row{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
@@ -301,30 +291,11 @@
   .user-result{ display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
   .user-result:last-child{ border-bottom:none; }
 
-  /* ============ LIVES VIEW ============ */
-  .lives-featured{ margin:20px 24px 8px; border:1px solid var(--border); position:relative; overflow:hidden; height:280px; }
-  .lives-featured .overlay{
-    position:absolute; inset:0; background:linear-gradient(0deg, rgba(0,0,0,.85), rgba(0,0,0,.1) 55%);
-    display:flex; flex-direction:column; justify-content:flex-end; padding:20px;
-  }
-  .lives-featured .title{ font-family:var(--font-display); font-weight:700; font-size:20px; }
-  .lives-featured .meta{ font-family:var(--font-mono); font-size:12px; color:var(--text-dim); margin-top:6px; }
-  .live-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:16px 24px 40px; }
-  .live-card{ border:1px solid var(--border); }
-  .live-card .thumb{ height:140px; position:relative; overflow:hidden; }
-  .live-card .thumb .viewers{
-    position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,.65); font-family:var(--font-mono);
-    font-size:10px; padding:2px 6px; display:flex; align-items:center; gap:4px;
-  }
-  .live-card .info{ padding:10px 12px; display:flex; gap:9px; }
-  .live-card .ln{ font-size:13px; font-weight:700; }
-  .live-card .lh{ font-size:11px; color:var(--text-faint); font-family:var(--font-mono); }
-
   /* ============ MESSAGES VIEW ============ */
   .msg-shell{ flex:1; display:flex; min-width:0; height:100%; }
   .conv-list{ width:340px; flex-shrink:0; border-right:1px solid var(--border); overflow-y:auto; display:flex; flex-direction:column; }
   .conv-list-head{ padding:22px 22px 16px; }
-  .conv-list-head h1{ font-family:var(--font-display); font-size:19px; }
+  .conv-list-head h1{ font-family:var(--font-display); font-size:18px; }
   .conv-search{ margin:0 18px 16px; }
   .conv-items-scroll{ flex:1; overflow-y:auto; padding:4px 10px 20px; }
   .conv-item{ display:flex; gap:12px; padding:13px 12px; align-items:center; border-left:2px solid transparent; margin-bottom:2px; }
@@ -393,11 +364,13 @@
   .verified{
     display:inline-flex; width:15px; height:15px; flex-shrink:0;
     background:var(--accent); border-radius:50%; align-items:center; justify-content:center;
+    vertical-align:middle; position:relative; top:-1px;
   }
   .verified svg{ width:9px; height:9px; }
   .role-tag{
     font-family:var(--font-mono); font-size:9px; text-transform:uppercase; letter-spacing:.5px;
     color:var(--accent); border:1px solid var(--accent-dim); padding:1px 5px; margin-left:6px;
+    vertical-align:middle; display:inline-block;
   }
 
   /* ============ NEWS VIEW ============ */
@@ -531,14 +504,10 @@
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
       <span class="label">Search</span>
     </div>
-    <div class="nav-item" data-view="lives" onclick="goView('lives')">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="15" height="12" rx="1"/><path d="M17 10l5-3v10l-5-3"/></svg>
-      <span class="label">Lives</span>
-    </div>
     <div class="nav-item" data-view="messages" onclick="goView('messages')">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
       <span class="label">Messages</span>
-      <span class="badge">3</span>
+      <span class="badge hidden" id="messages-badge">0</span>
     </div>
     <div class="nav-item" data-view="news" onclick="goView('news')">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11a9 9 0 019 9"/><path d="M4 4a16 16 0 0116 16"/><circle cx="5" cy="19" r="1"/></svg>
@@ -613,19 +582,6 @@
           <div id="search-users"></div>
         </div>
       </div>
-    </div>
-
-    <!-- ============ LIVES VIEW ============ -->
-    <div class="view hidden" id="v-lives">
-      <div class="topbar"><h1>Lives</h1><div class="sub"><span class="live-dot"></span>streaming right now</div></div>
-      <div class="lives-featured cut" id="live-featured" style="background:linear-gradient(135deg,#3a1408,#0a0a0b 70%);">
-        <div class="overlay">
-          <div class="live-badge" style="position:static;display:inline-flex;margin-bottom:8px;">● LIVE</div>
-          <div class="title">bias wars: comeback countdown 🔥</div>
-          <div class="meta">hosted by @stay_broadcast · 12.4k watching</div>
-        </div>
-      </div>
-      <div class="live-grid" id="live-grid"></div>
     </div>
 
     <!-- ============ MESSAGES VIEW ============ -->
@@ -760,10 +716,6 @@
     <div class="panel cut">
       <div class="panel-head">Trending <span style="color:var(--text-faint);font-size:10px;">STAYTION</span></div>
       <div id="trend-panel"></div>
-    </div>
-    <div class="panel cut">
-      <div class="panel-head">Live Now</div>
-      <div id="live-panel"></div>
     </div>
     <div class="panel cut">
       <div class="panel-head">Who to Follow</div>
@@ -985,7 +937,7 @@ function connectSocket(){
    ========================================================================= */
 function goView(name){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
-  ['feed','search','lives','messages','news','notifications','modtools','profile'].forEach(v=>{
+  ['feed','search','messages','news','notifications','modtools','profile'].forEach(v=>{
     document.getElementById('v-'+v).classList.toggle('hidden', v!==name);
   });
   document.getElementById('side-rail').style.display = (name==='feed') ? 'flex' : 'none';
@@ -1067,7 +1019,6 @@ async function loadTrendingSidebar(){
         <div class="count">${t.count} post${t.count===1?'':'s'}</div>
       </div>`).join('');
   }
-  document.getElementById('live-panel').innerHTML = `<div class="live-mini" style="color:var(--text-faint);font-family:var(--font-mono);font-size:11.5px;">live streaming isn't wired up yet — this panel is still a preview.</div>`;
 }
 async function loadSuggestedFollows(){
   const data = await api('/users/search?q=');
@@ -1113,23 +1064,13 @@ async function toggleFollowFromList(username, btn){
 }
 
 /* =========================================================================
-   LIVES (still a visual preview — no streaming backend yet)
-   ========================================================================= */
-function renderLivesPreview(){
-  const grid = document.getElementById('live-grid');
-  if(grid.dataset.rendered) return;
-  grid.dataset.rendered = '1';
-  grid.innerHTML = `<div style="grid-column:1/-1;color:var(--text-faint);font-family:var(--font-mono);font-size:12.5px;padding:10px 0;">live streaming isn't connected to a real broadcast backend yet — this page is still a visual preview.</div>`;
-}
-renderLivesPreview();
-
-/* =========================================================================
    MESSAGES
    ========================================================================= */
 async function loadConversations(){
   const data = await api('/conversations');
   lastConversations = data.conversations;
   renderConvList(filterConvList(data.conversations));
+  updateMessagesBadge(data.conversations);
   if(!activeConversationId && data.conversations.length){
     openConv(data.conversations[0].id, data.conversations[0].other);
   } else if(!data.conversations.length){
@@ -1137,6 +1078,12 @@ async function loadConversations(){
     document.getElementById('chat-sub').textContent = '';
     document.getElementById('chat-body').innerHTML = `<div style="color:var(--text-faint);font-family:var(--font-mono);font-size:12.5px;text-align:center;margin-top:40px;">no conversations yet — follow someone and message them from their profile.</div>`;
   }
+}
+function updateMessagesBadge(conversations){
+  const totalUnread = conversations.reduce((sum,c)=>sum+(c.unread||0), 0);
+  const badge = document.getElementById('messages-badge');
+  if(totalUnread>0){ badge.textContent = totalUnread; badge.classList.remove('hidden'); }
+  else { badge.classList.add('hidden'); }
 }
 function filterConvList(conversations){
   const q = (document.getElementById('conv-search-input')?.value || '').trim().toLowerCase();
@@ -1400,7 +1347,7 @@ async function openProfile(username){
 }
 function goViewOnlyProfile(){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view==='profile'));
-  ['feed','search','lives','messages','news','notifications','modtools','profile'].forEach(v=>{
+  ['feed','search','messages','news','notifications','modtools','profile'].forEach(v=>{
     document.getElementById('v-'+v).classList.toggle('hidden', v!=='profile');
   });
   document.getElementById('side-rail').style.display = 'none';
