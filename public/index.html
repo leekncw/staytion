@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STAYtion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0a0b;
+    --bg-elev:#141417;
+    --surface:#1b1b1f;
+    --surface-2:#222226;
+    --border:#2b2b30;
+    --text:#f5f5f3;
+    --text-dim:#9a9aa1;
+    --text-faint:#5c5c63;
+    --accent:#ff5a1f;
+    --accent-2:#ff8a4c;
+    --accent-dim:#7a2c10;
+    --accent-glow:rgba(255,90,31,.35);
+    --live-red:#ff3b5c;
+    --font-display:'Space Grotesk',sans-serif;
+    --font-body:'Inter',sans-serif;
+    --font-mono:'Space Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  ::selection{background:var(--accent);color:#0a0a0b;}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:var(--surface-2);border-radius:4px;}
+  a{color:inherit;text-decoration:none;}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+  input,textarea{font-family:inherit;color:inherit;background:none;border:none;outline:none;}
+  svg{display:block;flex-shrink:0;}
+
+  .cut{ clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px)); }
+  .cut-sm{ clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
+
+  .hidden{display:none !important;}
+
+  /* ---------- SCANLINE / NOISE BG ---------- */
+  .scan-bg{
+    position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 3px),
+      radial-gradient(ellipse at 20% -10%, rgba(255,90,31,0.08), transparent 45%),
+      radial-gradient(ellipse at 100% 110%, rgba(255,90,31,0.06), transparent 40%);
+  }
+
+  /* ================= LOGIN ================= */
+  #view-login{
+    position:relative; z-index:1;
+    height:100vh; display:flex; align-items:center; justify-content:center;
+    padding:24px;
+  }
+  .login-grid{
+    position:absolute; inset:0;
+    background-image: linear-gradient(rgba(255,90,31,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,90,31,0.06) 1px, transparent 1px);
+    background-size: 42px 42px;
+    -webkit-mask-image: radial-gradient(ellipse at center, black 0%, transparent 70%);
+            mask-image: radial-gradient(ellipse at center, black 0%, transparent 70%);
+  }
+  .login-card{
+    position:relative; z-index:1;
+    width:100%; max-width:420px;
+    background:var(--bg-elev);
+    border:1px solid var(--border);
+    padding:44px 38px 36px;
+  }
+  .login-card::before{
+    content:'';
+    position:absolute; top:0; left:0; width:100%; height:3px;
+    background:linear-gradient(90deg, transparent, var(--accent), transparent);
+  }
+  .logo-wrap{ text-align:center; margin-bottom:6px; }
+  .logo{
+    font-family:var(--font-display); font-weight:700; font-size:34px; letter-spacing:1px;
+    position:relative; display:inline-block;
+    text-shadow: 0 0 24px var(--accent-glow);
+  }
+  .logo span{ color:var(--accent); }
+  .logo::after{
+    content:'STAYTION';
+    position:absolute; left:2px; top:0; width:100%; height:100%;
+    color:var(--accent); opacity:0; overflow:hidden;
+    animation: glitch 5s infinite steps(1);
+    clip-path: inset(0 0 60% 0);
+  }
+  @keyframes glitch{
+    0%,92%,100%{opacity:0; transform:translate(0,0);}
+    93%{opacity:.7; transform:translate(-2px,1px); clip-path:inset(10% 0 40% 0);}
+    95%{opacity:.5; transform:translate(2px,-1px); clip-path:inset(60% 0 5% 0);}
+    97%{opacity:.7; transform:translate(-1px,0); clip-path:inset(30% 0 55% 0);}
+  }
+  .tagline{
+    text-align:center; font-family:var(--font-mono); font-size:11px; letter-spacing:3px;
+    color:var(--text-dim); margin-top:8px; text-transform:uppercase;
+  }
+  .live-dot{
+    display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--accent);
+    margin-right:6px; animation:pulse 1.6s infinite;
+  }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
+
+  .auth-toggle{
+    display:flex; margin:32px 0 24px; border:1px solid var(--border);
+  }
+  .auth-toggle button{
+    flex:1; padding:10px; font-family:var(--font-mono); font-size:12px; letter-spacing:1.5px;
+    text-transform:uppercase; color:var(--text-dim); transition:.15s;
+  }
+  .auth-toggle button.active{ background:var(--accent); color:#0a0a0b; font-weight:700; }
+
+  .field{ margin-bottom:16px; }
+  .field label{
+    display:block; font-family:var(--font-mono); font-size:10px; letter-spacing:2px;
+    color:var(--text-faint); text-transform:uppercase; margin-bottom:7px;
+  }
+  .field .input-box{
+    border:1px solid var(--border); background:var(--surface); padding:12px 14px;
+    display:flex; align-items:center; gap:8px; transition:border-color .15s;
+  }
+  .field .input-box:focus-within{ border-color:var(--accent); }
+  .field .input-box .prefix{ color:var(--text-faint); font-family:var(--font-mono); font-size:14px; }
+  .field input{ flex:1; font-size:14px; }
+  .field-hint{ font-family:var(--font-mono); font-size:10.5px; margin-top:6px; color:var(--text-faint); letter-spacing:.3px; }
+  .field-hint.ok{ color:#4ade80; }
+  .field-hint.err{ color:var(--live-red); }
+
+  .btn-primary{
+    width:100%; padding:13px; background:var(--accent); color:#0a0a0b;
+    font-weight:700; font-family:var(--font-display); font-size:14px; letter-spacing:1px;
+    text-transform:uppercase; margin-top:6px; transition:filter .15s, transform .1s;
+  }
+  .btn-primary:hover{ filter:brightness(1.1); }
+  .btn-primary:active{ transform:scale(.98); }
+  .btn-primary:disabled{ background:var(--surface-2); color:var(--text-faint); cursor:not-allowed; }
+
+  .login-foot{
+    text-align:center; margin-top:22px; font-size:12px; color:var(--text-faint);
+    font-family:var(--font-mono);
+  }
+
+  /* ================= APP SHELL ================= */
+  #app{ position:relative; z-index:1; height:100vh; display:flex; }
+
+  .rail{
+    width:232px; flex-shrink:0; border-right:1px solid var(--border);
+    display:flex; flex-direction:column; padding:20px 14px;
+    background:var(--bg-elev);
+  }
+  .rail-logo{ font-family:var(--font-display); font-weight:700; font-size:20px; padding:6px 10px 24px; letter-spacing:.5px;}
+  .rail-logo span{ color:var(--accent); }
+  .nav-item{
+    display:flex; align-items:center; gap:12px; padding:11px 12px; margin-bottom:2px;
+    font-family:var(--font-display); font-weight:500; font-size:14.5px; color:var(--text-dim);
+    border-left:2px solid transparent; transition:.12s;
+  }
+  .nav-item:hover{ color:var(--text); background:var(--surface); }
+  .nav-item.active{ color:var(--accent); border-left-color:var(--accent); background:var(--surface); }
+  .nav-item .badge{
+    margin-left:auto; background:var(--accent); color:#0a0a0b; font-family:var(--font-mono);
+    font-size:10px; padding:1px 6px; font-weight:700;
+  }
+  .rail-post-btn{
+    margin-top:10px; padding:12px; background:var(--accent); color:#0a0a0b;
+    font-family:var(--font-display); font-weight:700; font-size:13.5px; text-align:center;
+    letter-spacing:.5px; text-transform:uppercase;
+  }
+  .rail-post-btn:hover{ filter:brightness(1.08); }
+  .rail-user{
+    margin-top:auto; padding-top:14px; border-top:1px solid var(--border);
+    display:flex; align-items:center; gap:10px; cursor:pointer;
+  }
+  .rail-user:hover{ opacity:.85; }
+  .rail-user .name{ font-size:13px; font-weight:600; }
+  .rail-user .handle{ font-size:11px; color:var(--text-faint); font-family:var(--font-mono); }
+
+  .avatar{
+    border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-display); font-weight:700; color:#0a0a0b; flex-shrink:0;
+  }
+
+  .main-col{ flex:1; display:flex; min-width:0; }
+
+  .view{ flex:1; overflow-y:auto; min-width:0; }
+  .view-inner{ max-width:640px; margin:0 auto; padding:0 0 60px; }
+
+  .topbar{
+    position:sticky; top:0; z-index:5; background:rgba(10,10,11,.88); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border); padding:16px 24px;
+  }
+  .topbar h1{ font-family:var(--font-display); font-size:18px; letter-spacing:.5px; }
+  .topbar .sub{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); margin-top:3px; }
+
+  /* search bar (reused) */
+  .search-bar{
+    display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--border);
+    padding:11px 14px;
+  }
+  .search-bar:focus-within{ border-color:var(--accent); }
+  .search-bar input{ flex:1; font-size:14px; }
+  .search-bar svg{ color:var(--text-faint); }
+
+  /* composer */
+  .composer{ padding:18px 24px; border-bottom:8px solid var(--bg); display:flex; gap:12px; }
+  .composer textarea{
+    flex:1; resize:none; font-size:15px; line-height:1.5; min-height:44px; padding-top:8px;
+  }
+  .composer textarea::placeholder{ color:var(--text-faint); }
+  .composer-row{ display:flex; align-items:center; justify-content:space-between; margin-top:10px; }
+  .composer-icons{ display:flex; gap:14px; color:var(--text-faint); }
+  .btn-post{
+    background:var(--accent); color:#0a0a0b; font-family:var(--font-display); font-weight:700;
+    font-size:12.5px; padding:8px 20px; text-transform:uppercase; letter-spacing:.5px;
+  }
+  .btn-post:hover{ filter:brightness(1.1); }
+
+  /* post card */
+  .post{ padding:18px 24px; border-bottom:1px solid var(--border); display:flex; gap:12px; }
+  .post:hover{ background:rgba(255,255,255,0.012); }
+  .post-body{ flex:1; min-width:0; }
+  .post-head{ display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; }
+  .post-head .name{ font-weight:700; font-size:14.5px; }
+  .post-head .handle,.post-head .dot,.post-head .time{ color:var(--text-faint); font-size:13px; font-family:var(--font-mono); }
+  .post-text{ font-size:14.5px; line-height:1.55; margin-top:4px; }
+  .post-text .tag{ color:var(--accent); font-weight:600; }
+  .post-media{
+    margin-top:12px; height:220px; border:1px solid var(--border); position:relative; overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .post-media .cap{ font-family:var(--font-mono); font-size:11px; color:rgba(255,255,255,.6); position:absolute; bottom:10px; left:12px; letter-spacing:1px; }
+  .post-actions{ display:flex; gap:34px; margin-top:14px; }
+  .post-actions button{
+    display:flex; align-items:center; gap:7px; color:var(--text-faint); font-size:13px; font-family:var(--font-mono);
+    transition:.12s;
+  }
+  .post-actions button:hover{ color:var(--accent); }
+  .post-actions button.liked{ color:var(--accent); }
+
+  /* right rail */
+  .side-rail{ width:320px; flex-shrink:0; border-left:1px solid var(--border); padding:20px; overflow-y:auto; display:flex; flex-direction:column; gap:20px; }
+  .panel{ border:1px solid var(--border); background:var(--bg-elev); }
+  .panel-head{
+    padding:13px 16px; font-family:var(--font-display); font-weight:700; font-size:13.5px;
+    border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;
+    text-transform:uppercase; letter-spacing:.5px;
+  }
+  .trend-row{ padding:11px 16px; border-bottom:1px solid var(--border); }
+  .trend-row:last-child{ border-bottom:none; }
+  .trend-row .cat{ font-family:var(--font-mono); font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:1px; }
+  .trend-row .tag{ font-weight:700; font-size:14px; margin:2px 0; color:var(--text); }
+  .trend-row .tag span{ color:var(--accent); }
+  .trend-row .count{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); }
+  .follow-row{ padding:11px 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border); }
+  .follow-row:last-child{ border-bottom:none; }
+  .follow-row .fi{ flex:1; min-width:0; }
+  .follow-row .fn{ font-size:13px; font-weight:700; }
+  .follow-row .fh{ font-size:11.5px; color:var(--text-faint); font-family:var(--font-mono); }
+  .btn-follow{
+    border:1px solid var(--accent); color:var(--accent); font-family:var(--font-mono); font-size:11px;
+    padding:5px 12px; text-transform:uppercase; letter-spacing:.5px;
+  }
+  .btn-follow:hover{ background:var(--accent); color:#0a0a0b; }
+  .live-mini{ padding:11px 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border); }
+  .live-mini:last-child{ border-bottom:none; }
+  .live-mini .thumb{ width:52px; height:38px; flex-shrink:0; position:relative; overflow:hidden; }
+  .live-badge{
+    position:absolute; top:3px; left:3px; background:var(--live-red); color:#fff; font-family:var(--font-mono);
+    font-size:8px; font-weight:700; padding:1px 4px; letter-spacing:.5px;
+  }
+  .live-mini .ln{ font-size:12.5px; font-weight:700; }
+  .live-mini .lv{ font-size:11px; color:var(--text-faint); font-family:var(--font-mono); }
+
+  /* ============ SEARCH VIEW ============ */
+  .search-hero{ padding:20px 24px; border-bottom:1px solid var(--border); }
+  .chip-row{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+  .chip{
+    font-family:var(--font-mono); font-size:11.5px; padding:6px 12px; border:1px solid var(--border);
+    color:var(--text-dim);
+  }
+  .chip:hover{ border-color:var(--accent); color:var(--accent); }
+  .search-section{ padding:18px 24px; }
+  .search-section h3{ font-family:var(--font-display); font-size:13px; text-transform:uppercase; letter-spacing:1px; color:var(--text-dim); margin-bottom:12px; }
+  .trend-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .trend-tile{ border:1px solid var(--border); padding:14px; background:var(--bg-elev); }
+  .trend-tile:hover{ border-color:var(--accent); }
+  .trend-tile .rank{ font-family:var(--font-mono); font-size:10px; color:var(--accent); }
+  .trend-tile .name{ font-weight:700; margin:4px 0 2px; font-size:14px; }
+  .trend-tile .meta{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); }
+  .user-result{ display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
+  .user-result:last-child{ border-bottom:none; }
+
+  /* ============ LIVES VIEW ============ */
+  .lives-featured{ margin:20px 24px 8px; border:1px solid var(--border); position:relative; overflow:hidden; height:280px; }
+  .lives-featured .overlay{
+    position:absolute; inset:0; background:linear-gradient(0deg, rgba(0,0,0,.85), rgba(0,0,0,.1) 55%);
+    display:flex; flex-direction:column; justify-content:flex-end; padding:20px;
+  }
+  .lives-featured .title{ font-family:var(--font-display); font-weight:700; font-size:20px; }
+  .lives-featured .meta{ font-family:var(--font-mono); font-size:12px; color:var(--text-dim); margin-top:6px; }
+  .live-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:16px 24px 40px; }
+  .live-card{ border:1px solid var(--border); }
+  .live-card .thumb{ height:140px; position:relative; overflow:hidden; }
+  .live-card .thumb .viewers{
+    position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,.65); font-family:var(--font-mono);
+    font-size:10px; padding:2px 6px; display:flex; align-items:center; gap:4px;
+  }
+  .live-card .info{ padding:10px 12px; display:flex; gap:9px; }
+  .live-card .ln{ font-size:13px; font-weight:700; }
+  .live-card .lh{ font-size:11px; color:var(--text-faint); font-family:var(--font-mono); }
+
+  /* ============ MESSAGES VIEW ============ */
+  .msg-shell{ flex:1; display:flex; min-width:0; height:100%; }
+  .conv-list{ width:340px; flex-shrink:0; border-right:1px solid var(--border); overflow-y:auto; display:flex; flex-direction:column; }
+  .conv-list-head{ padding:22px 22px 16px; }
+  .conv-list-head h1{ font-family:var(--font-display); font-size:19px; }
+  .conv-search{ margin:0 18px 16px; }
+  .conv-items-scroll{ flex:1; overflow-y:auto; padding:4px 10px 20px; }
+  .conv-item{ display:flex; gap:12px; padding:13px 12px; align-items:center; border-left:2px solid transparent; margin-bottom:2px; }
+  .conv-item:hover{ background:var(--surface); }
+  .conv-item.active{ background:var(--surface); border-left-color:var(--accent); }
+  .conv-item .ci{ flex:1; min-width:0; }
+  .conv-item .cn{ font-size:14px; font-weight:700; display:flex; align-items:center; gap:6px; margin-bottom:3px; }
+  .conv-item .cm{ font-size:12.5px; color:var(--text-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .conv-item .ct{ font-size:10.5px; color:var(--text-faint); font-family:var(--font-mono); flex-shrink:0; }
+  .conv-item .unread{ background:var(--accent); color:#0a0a0b; font-size:10px; font-weight:700; padding:1px 6px; font-family:var(--font-mono); }
+  .dot-online{ width:7px; height:7px; border-radius:50%; background:#4ade80; display:inline-block; flex-shrink:0; }
+
+  .chat-col{ flex:1; display:flex; flex-direction:column; min-width:0; background:var(--bg-elev); }
+  .chat-head{ padding:19px 32px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:14px; flex-shrink:0; }
+  .chat-head .cn{ font-weight:700; font-size:16px; }
+  .chat-head .cs{ font-size:12px; color:var(--text-faint); font-family:var(--font-mono); margin-top:2px; }
+  .chat-body{ flex:1; overflow-y:auto; padding:28px 40px; display:flex; flex-direction:column; gap:20px; }
+  .bubble-row{ display:flex; gap:12px; max-width:62%; }
+  .bubble-row.me{ align-self:flex-end; flex-direction:row-reverse; }
+  .bubble{ padding:12px 16px; font-size:14.5px; line-height:1.55; }
+  .bubble-row:not(.me) .bubble{ background:var(--surface); border:1px solid var(--border); }
+  .bubble-row.me .bubble{ background:var(--accent); color:#0a0a0b; font-weight:500; }
+  .bubble-meta{ font-family:var(--font-mono); font-size:10px; color:var(--text-faint); margin-top:6px; }
+  .bubble-row.me .bubble-meta{ text-align:right; }
+  .chat-input{ padding:20px 32px 26px; border-top:1px solid var(--border); display:flex; gap:12px; align-items:center; flex-shrink:0; }
+  .chat-input .input-box{ flex:1; border:1px solid var(--border); background:var(--surface); padding:13px 16px; }
+  .chat-input .input-box input{ width:100%; font-size:14.5px; }
+  .send-btn{ background:var(--accent); color:#0a0a0b; padding:13px 18px; display:flex; align-items:center; justify-content:center; }
+  .send-btn:hover{ filter:brightness(1.1); }
+
+  /* ============ PROFILE VIEW ============ */
+  .banner{ height:190px; }
+  .banner-edit-hint{
+    position:absolute; inset:0; background:rgba(10,10,11,.55); display:flex; align-items:center; justify-content:center;
+    gap:8px; font-family:var(--font-mono); font-size:12px; letter-spacing:.5px; text-transform:uppercase;
+    cursor:pointer; opacity:0; transition:opacity .15s;
+  }
+  .banner:hover .banner-edit-hint{ opacity:1; }
+  .avatar-edit-hint{
+    position:absolute; inset:0; border-radius:50%; background:rgba(10,10,11,.6); display:flex; align-items:center; justify-content:center;
+    cursor:pointer; opacity:0; transition:opacity .15s;
+  }
+  .pfp-lg:hover .avatar-edit-hint{ opacity:1; }
+  .profile-head{ padding:0 24px; position:relative; }
+  .pfp-lg{ width:104px; height:104px; border:4px solid var(--bg); margin-top:-52px; font-size:34px; }
+  .profile-actions{ display:flex; justify-content:flex-end; margin-top:14px; }
+  .btn-edit{ border:1px solid var(--border); font-family:var(--font-display); font-weight:700; font-size:12.5px; padding:9px 18px; letter-spacing:.3px; }
+  .btn-edit:hover{ border-color:var(--accent); color:var(--accent); }
+  .profile-name{ font-family:var(--font-display); font-weight:700; font-size:21px; margin-top:14px; }
+  .profile-handle{ color:var(--text-faint); font-family:var(--font-mono); font-size:13px; margin-top:2px; }
+  .profile-bio{ font-size:14px; line-height:1.55; margin-top:12px; max-width:480px; }
+  .profile-stats{ display:flex; gap:22px; margin-top:14px; }
+  .profile-stats b{ font-size:14px; }
+  .profile-stats span{ color:var(--text-faint); font-size:12.5px; margin-left:4px; }
+  .profile-tabs{ display:flex; margin-top:20px; border-bottom:1px solid var(--border); }
+  .profile-tabs button{
+    padding:13px 18px; font-family:var(--font-display); font-weight:600; font-size:13px;
+    color:var(--text-faint); border-bottom:2px solid transparent; text-transform:uppercase; letter-spacing:.5px;
+  }
+  .profile-tabs button.active{ color:var(--text); border-bottom-color:var(--accent); }
+  .profile-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:2px; margin-top:2px; }
+  .profile-grid .cell{ aspect-ratio:1; position:relative; overflow:hidden; }
+  .profile-grid .cell .pin{ position:absolute; top:6px; right:6px; }
+
+  /* ============ VERIFIED BADGE ============ */
+  .verified{
+    display:inline-flex; width:15px; height:15px; flex-shrink:0;
+    background:var(--accent); border-radius:50%; align-items:center; justify-content:center;
+  }
+  .verified svg{ width:9px; height:9px; }
+  .role-tag{
+    font-family:var(--font-mono); font-size:9px; text-transform:uppercase; letter-spacing:.5px;
+    color:var(--accent); border:1px solid var(--accent-dim); padding:1px 5px; margin-left:6px;
+  }
+
+  /* ============ NEWS VIEW ============ */
+  .news-composer{ padding:18px 24px; border-bottom:8px solid var(--bg); }
+  .news-composer .label-row{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .news-composer .label-row .tag-official{
+    font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:1px;
+    background:var(--accent); color:#0a0a0b; padding:2px 8px; font-weight:700;
+  }
+  .news-composer textarea{ width:100%; resize:none; font-size:15px; line-height:1.5; min-height:60px; background:var(--surface); border:1px solid var(--border); padding:12px 14px; }
+  .news-composer .composer-row{ margin-top:10px; }
+  .news-post{ padding:18px 24px; border-bottom:1px solid var(--border); border-left:2px solid var(--accent); display:flex; gap:12px; }
+  .news-post .pin{ display:flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:10.5px; color:var(--accent); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+  .news-icon{
+    width:42px; height:42px; flex-shrink:0; background:var(--surface); border:1px solid var(--accent-dim);
+    display:flex; align-items:center; justify-content:center; color:var(--accent);
+  }
+
+  /* ============ NOTIFICATIONS VIEW ============ */
+  .notif-section-label{ padding:14px 24px 6px; font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:var(--text-faint); }
+  .notif-row{ display:flex; gap:13px; padding:14px 24px; border-bottom:1px solid var(--border); align-items:flex-start; }
+  .notif-row.unread{ background:rgba(255,90,31,0.05); border-left:2px solid var(--accent); }
+  .notif-row:not(.unread){ border-left:2px solid transparent; }
+  .notif-icon{ width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .notif-icon.like{ background:rgba(255,90,31,0.15); color:var(--accent); }
+  .notif-icon.follow{ background:rgba(255,255,255,0.08); color:var(--text-dim); }
+  .notif-icon.verify{ background:var(--accent); color:#0a0a0b; }
+  .notif-icon.comment{ background:rgba(255,255,255,0.08); color:var(--text-dim); }
+  .notif-text{ font-size:14px; line-height:1.5; }
+  .notif-text b{ font-weight:700; }
+  .notif-time{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); margin-top:3px; }
+
+  /* ============ MOD TOOLS VIEW ============ */
+  .mod-banner{ margin:20px 24px; border:1px solid var(--accent-dim); background:rgba(255,90,31,0.06); padding:16px 18px; }
+  .mod-banner .mb-title{ font-family:var(--font-display); font-weight:700; font-size:14px; color:var(--accent); display:flex; align-items:center; gap:8px; }
+  .mod-banner ul{ margin:10px 0 0 18px; font-size:12.5px; color:var(--text-dim); line-height:1.7; }
+  .mod-search{ margin:0 24px 14px; }
+  .mod-user-row{ display:flex; align-items:center; gap:12px; padding:13px 24px; border-bottom:1px solid var(--border); }
+  .mod-user-row .mi{ flex:1; min-width:0; }
+  .mod-user-row .mn{ font-size:13.5px; font-weight:700; display:flex; align-items:center; gap:6px; }
+  .mod-user-row .mh{ font-size:11.5px; color:var(--text-faint); font-family:var(--font-mono); }
+  .mod-user-row .stats{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); margin-top:2px; }
+  .btn-verify{
+    font-family:var(--font-mono); font-size:11px; padding:7px 14px; text-transform:uppercase; letter-spacing:.5px;
+    border:1px solid var(--accent); color:var(--accent); flex-shrink:0;
+  }
+  .btn-verify:hover{ background:var(--accent); color:#0a0a0b; }
+  .btn-verify.granted{ background:var(--surface-2); border-color:var(--border); color:var(--text-faint); cursor:default; }
+  .btn-verify.granted:hover{ background:var(--surface-2); color:var(--text-faint); }
+
+
+  @media (max-width:880px){
+    .rail{ width:76px; padding:16px 8px; }
+    .rail-logo{ display:none; }
+    .nav-item span.label{ display:none; }
+    .nav-item{ justify-content:center; }
+    .rail-post-btn{ font-size:0; padding:12px 0; }
+    .rail-post-btn::before{ content:'+'; font-size:20px; }
+    .rail-user .name,.rail-user .handle{ display:none; }
+    .conv-list{ width:76px; }
+    .conv-item .ci{ display:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="scan-bg"></div>
+
+<!-- ================= LOGIN VIEW ================= -->
+<div id="view-login">
+  <div class="login-grid"></div>
+  <div class="login-card cut">
+    <div class="logo-wrap">
+      <div class="logo">STAY<span>TION</span></div>
+    </div>
+    <div class="tagline"><span class="live-dot"></span>a place for stay, always</div>
+
+    <div class="auth-toggle">
+      <button id="tab-login" class="active" onclick="switchAuth('login')">Log In</button>
+      <button id="tab-signup" onclick="switchAuth('signup')">Sign Up</button>
+    </div>
+
+    <!-- LOGIN FORM -->
+    <div id="form-login">
+      <div class="field">
+        <label>Username</label>
+        <div class="input-box"><span class="prefix">@</span><input id="li-username" type="text" placeholder="yourname" autocomplete="off"></div>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <div class="input-box"><input id="li-password" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      </div>
+      <div class="field-hint err hidden" id="login-error"></div>
+      <button class="btn-primary" onclick="doLogin()">Enter STAYtion</button>
+      <div class="login-foot">not a member yet? <a onclick="switchAuth('signup')" style="color:var(--accent);cursor:pointer;">create an account</a></div>
+    </div>
+
+    <!-- SIGNUP FORM -->
+    <div id="form-signup" class="hidden">
+      <div class="field">
+        <label>Display Name</label>
+        <div class="input-box"><input id="su-display" type="text" placeholder="Lee Y." autocomplete="off"></div>
+      </div>
+      <div class="field">
+        <label>Username</label>
+        <div class="input-box"><span class="prefix">@</span><input id="su-username" type="text" placeholder="lowercase, 2+ chars" autocomplete="off" oninput="validateUsername()"></div>
+        <div class="field-hint" id="username-hint">2+ characters · lowercase letters, numbers, underscores only</div>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <div class="input-box"><input id="su-password" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doSignup()"></div>
+      </div>
+      <div class="field-hint err hidden" id="signup-error"></div>
+      <button class="btn-primary" id="su-submit" disabled onclick="doSignup()">Create Account</button>
+      <div class="login-foot">already STAY? <a onclick="switchAuth('login')" style="color:var(--accent);cursor:pointer;">log in</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= APP SHELL ================= -->
+<div id="app" class="hidden">
+
+  <!-- LEFT RAIL -->
+  <nav class="rail">
+    <div class="rail-logo">STAY<span>TION</span></div>
+    <div class="nav-item active" data-view="feed" onclick="goView('feed')">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
+      <span class="label">Feed</span>
+    </div>
+    <div class="nav-item" data-view="search" onclick="goView('search')">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <span class="label">Search</span>
+    </div>
+    <div class="nav-item" data-view="lives" onclick="goView('lives')">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="15" height="12" rx="1"/><path d="M17 10l5-3v10l-5-3"/></svg>
+      <span class="label">Lives</span>
+    </div>
+    <div class="nav-item" data-view="messages" onclick="goView('messages')">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      <span class="label">Messages</span>
+      <span class="badge">3</span>
+    </div>
+    <div class="nav-item" data-view="news" onclick="goView('news')">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11a9 9 0 019 9"/><path d="M4 4a16 16 0 0116 16"/><circle cx="5" cy="19" r="1"/></svg>
+      <span class="label">News</span>
+    </div>
+    <div class="nav-item" data-view="notifications" onclick="goView('notifications')">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      <span class="label">Notifications</span>
+      <span class="badge" id="notif-badge">5</span>
+    </div>
+    <div class="nav-item hidden" data-view="modtools" id="nav-modtools" onclick="goView('modtools')">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/></svg>
+      <span class="label">Mod Tools</span>
+    </div>
+    <div class="nav-item" data-view="profile" onclick="goView('profile')">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4.5 5-6 8-6s6.5 1.5 8 6"/></svg>
+      <span class="label">Profile</span>
+    </div>
+    <button class="rail-post-btn cut-sm" onclick="goView('feed')">Post</button>
+    <div class="rail-user" onclick="goView('profile')">
+      <div class="avatar" id="me-avatar" style="width:36px;height:36px;background:var(--accent);font-size:13px;">SK</div>
+      <div>
+        <div class="name" id="me-name">skzstay <span class="role-tag" id="me-role">Owner</span></div>
+        <div class="handle" id="me-handle">@skzstay</div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="main-col">
+
+    <!-- ============ FEED VIEW ============ -->
+    <div class="view" id="v-feed">
+      <div class="topbar">
+        <h1>Home</h1>
+        <div class="sub">your feed · straykids &amp; stay</div>
+      </div>
+      <div class="view-inner">
+        <div class="composer">
+          <div class="avatar" id="composer-avatar" style="width:42px;height:42px;background:var(--accent);font-size:14px;">SK</div>
+          <div style="flex:1;">
+            <textarea id="composer-text" placeholder="what's on your mind, STAY?"></textarea>
+            <div class="composer-row">
+              <div class="composer-icons">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              </div>
+              <button class="btn-post" onclick="submitPost()">Post</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="feed-posts"></div>
+      </div>
+    </div>
+
+    <!-- ============ SEARCH VIEW ============ -->
+    <div class="view hidden" id="v-search">
+      <div class="topbar"><h1>Search</h1><div class="sub">explore stay &amp; trending topics</div></div>
+      <div class="view-inner" style="max-width:100%;">
+        <div class="search-hero">
+          <div class="search-bar cut-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input id="search-input" oninput="runSearch()" placeholder="search stay by username...">
+          </div>
+        </div>
+        <div class="search-section">
+          <h3>Trending for you</h3>
+          <div class="trend-grid" id="search-trend-grid"></div>
+        </div>
+        <div class="search-section">
+          <h3>Suggested STAY</h3>
+          <div id="search-users"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ LIVES VIEW ============ -->
+    <div class="view hidden" id="v-lives">
+      <div class="topbar"><h1>Lives</h1><div class="sub"><span class="live-dot"></span>streaming right now</div></div>
+      <div class="lives-featured cut" id="live-featured" style="background:linear-gradient(135deg,#3a1408,#0a0a0b 70%);">
+        <div class="overlay">
+          <div class="live-badge" style="position:static;display:inline-flex;margin-bottom:8px;">● LIVE</div>
+          <div class="title">bias wars: comeback countdown 🔥</div>
+          <div class="meta">hosted by @stay_broadcast · 12.4k watching</div>
+        </div>
+      </div>
+      <div class="live-grid" id="live-grid"></div>
+    </div>
+
+    <!-- ============ MESSAGES VIEW ============ -->
+    <div class="view hidden" id="v-messages" style="overflow:hidden;">
+      <div class="msg-shell">
+        <div class="conv-list">
+          <div class="conv-list-head"><h1>Messages</h1></div>
+          <div class="conv-search">
+            <div class="search-bar cut-sm" style="padding:8px 12px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+              <input id="conv-search-input" oninput="filterConversations()" placeholder="find a chat">
+            </div>
+          </div>
+          <div class="conv-items-scroll"><div id="conv-items"></div></div>
+        </div>
+        <div class="chat-col">
+          <div class="chat-head">
+            <div class="avatar" id="chat-avatar" style="width:38px;height:38px;background:var(--accent-2);font-size:13px;"></div>
+            <div>
+              <div class="cn" id="chat-name"></div>
+              <div class="cs" id="chat-sub"></div>
+            </div>
+          </div>
+          <div class="chat-body" id="chat-body"></div>
+          <div class="chat-input">
+            <div class="input-box cut-sm"><input placeholder="send a message..." onkeydown="if(event.key==='Enter')sendMsg()"></div>
+            <button class="send-btn cut-sm" onclick="sendMsg()">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ NEWS VIEW ============ -->
+    <div class="view hidden" id="v-news">
+      <div class="topbar"><h1>News</h1><div class="sub">official updates from the STAYtion team</div></div>
+      <div class="view-inner">
+        <div class="news-composer" id="news-composer">
+          <div class="label-row"><span class="tag-official">Official</span><span style="font-size:12.5px;color:var(--text-faint);font-family:var(--font-mono);">posting as the STAYtion team</span></div>
+          <input id="news-title-input" placeholder="title" style="width:100%;font-family:var(--font-display);font-weight:700;font-size:16px;background:var(--surface);border:1px solid var(--border);padding:12px 14px;margin-bottom:8px;">
+          <textarea id="news-input" placeholder="share a platform update, patch note, or announcement..."></textarea>
+          <div class="composer-row"><div></div><button class="btn-post" onclick="postNews()">Publish</button></div>
+        </div>
+        <div id="news-posts"></div>
+      </div>
+    </div>
+
+    <!-- ============ NOTIFICATIONS VIEW ============ -->
+    <div class="view hidden" id="v-notifications">
+      <div class="topbar"><h1>Notifications</h1><div class="sub">follows, likes &amp; activity</div></div>
+      <div class="view-inner" id="notif-list"></div>
+    </div>
+
+    <!-- ============ MOD TOOLS VIEW ============ -->
+    <div class="view hidden" id="v-modtools">
+      <div class="topbar"><h1>Mod Tools</h1><div class="sub">verification &amp; community moderation</div></div>
+      <div class="mod-banner cut-sm">
+        <div class="mb-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/></svg>
+          Verification criteria
+        </div>
+        <ul>
+          <li>Account active for 90+ days with consistent posting</li>
+          <li>No moderation strikes in the last 60 days</li>
+          <li>Positive standing in the community (reports, vouches)</li>
+          <li>Final call is left to moderator judgment — this list is a guide, not a hard gate</li>
+        </ul>
+      </div>
+      <div class="mod-search">
+        <div class="search-bar cut-sm">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input placeholder="find a user to review">
+        </div>
+      </div>
+      <div id="mod-user-list"></div>
+    </div>
+
+    <!-- ============ PROFILE VIEW ============ -->
+    <div class="view hidden" id="v-profile">
+      <input type="file" id="banner-file-input" accept="image/*" class="hidden" onchange="handleBannerFile(event)">
+      <input type="file" id="avatar-file-input" accept="image/*" class="hidden" onchange="handleAvatarFile(event)">
+      <div class="banner" id="profile-banner" style="background:linear-gradient(120deg,#ff5a1f 0%, #7a2c10 45%, #0a0a0b 100%);position:relative;">
+        <div class="banner-edit-hint hidden" id="banner-edit-hint" onclick="triggerBannerUpload()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          change banner
+        </div>
+      </div>
+      <div class="profile-head">
+        <div class="avatar pfp-lg cut" id="profile-avatar" style="background:var(--accent);position:relative;">
+          <div class="avatar-edit-hint hidden" id="avatar-edit-hint" onclick="triggerAvatarUpload()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          </div>
+        </div>
+        <div class="profile-actions" id="profile-actions">
+          <button class="btn-edit cut-sm" onclick="openEditProfile()">Edit Profile</button>
+          <button class="btn-edit cut-sm" onclick="doLogout()">Log Out</button>
+        </div>
+        <div class="profile-name" id="profile-name-line"></div>
+        <div class="profile-handle" id="profile-handle-line"></div>
+        <div class="profile-bio" id="profile-bio-line"></div>
+
+        <div id="profile-edit-form" class="hidden" style="margin-top:14px;max-width:420px;">
+          <div class="field">
+            <label>Display Name</label>
+            <div class="input-box"><input id="edit-display-name" type="text"></div>
+          </div>
+          <div class="field">
+            <label>Bio</label>
+            <div class="input-box"><input id="edit-bio" type="text" maxlength="280"></div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="btn-post" onclick="saveProfileEdits()">Save</button>
+            <button class="btn-edit cut-sm" onclick="closeEditProfile()">Cancel</button>
+          </div>
+        </div>
+
+        <div class="profile-stats" id="profile-stats-line"></div>
+        <div class="profile-tabs">
+          <button class="active">Posts</button>
+          <button>Media</button>
+          <button>Likes</button>
+        </div>
+        <div id="profile-posts"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ RIGHT RAIL (feed only) ============ -->
+  <aside class="side-rail" id="side-rail">
+    <div class="panel cut">
+      <div class="panel-head">Trending <span style="color:var(--text-faint);font-size:10px;">STAYTION</span></div>
+      <div id="trend-panel"></div>
+    </div>
+    <div class="panel cut">
+      <div class="panel-head">Live Now</div>
+      <div id="live-panel"></div>
+    </div>
+    <div class="panel cut">
+      <div class="panel-head">Who to Follow</div>
+      <div id="follow-panel"></div>
+    </div>
+  </aside>
+
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+/* =========================================================================
+   STATE
+   ========================================================================= */
+let me = null;               // current logged-in user (public shape from server)
+let socket = null;
+let activeConversationId = null;
+let activeConversationOther = null;
+let viewingUsername = null;  // whose profile is currently open
+let searchDebounce = null;
+let lastConversations = [];
+
+const gradients = [
+  'linear-gradient(135deg,#ff5a1f,#3a1408)',
+  'linear-gradient(135deg,#2b2b30,#0a0a0b)',
+  'linear-gradient(135deg,#ff8a4c,#7a2c10)',
+  'linear-gradient(135deg,#141417,#ff5a1f 140%)',
+  'linear-gradient(135deg,#3a1408,#1b1b1f)',
+];
+function gradFor(username){
+  let h = 0;
+  for(let i=0;i<username.length;i++) h = (h*31 + username.charCodeAt(i)) >>> 0;
+  return gradients[h % gradients.length];
+}
+function initials(str){ return (str||'??').slice(0,2).toUpperCase(); }
+/* avatarStyle/avatarText: pass a user-shaped object {username, displayName, avatarUrl}.
+   Falls back to gradient + initials when there's no uploaded avatar. */
+function avatarStyle(u, sizePx){
+  const size = `width:${sizePx}px;height:${sizePx}px;`;
+  if(u && u.avatarUrl){
+    return `${size}background-image:url('${u.avatarUrl.replace(/'/g,'%27')}');background-size:cover;background-position:center;`;
+  }
+  return `${size}background:${gradFor((u&&u.username)||'??')};`;
+}
+function avatarText(u){
+  return (u && u.avatarUrl) ? '' : initials((u&&(u.displayName||u.username)) || '??');
+}
+function verifiedBadge(isVerified){
+  if(!isVerified) return '';
+  return `<span class="verified" title="Verified"><svg viewBox="0 0 24 24" fill="none" stroke="#0a0a0b" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span>`;
+}
+function esc(str){
+  const d = document.createElement('div');
+  d.textContent = str == null ? '' : String(str);
+  return d.innerHTML;
+}
+function timeAgo(ts){
+  const s = Math.floor((Date.now()-ts)/1000);
+  if(s<60) return 'just now';
+  if(s<3600) return Math.floor(s/60)+'m';
+  if(s<86400) return Math.floor(s/3600)+'h';
+  return Math.floor(s/86400)+'d';
+}
+
+/* =========================================================================
+   API HELPER
+   ========================================================================= */
+async function api(path, opts={}){
+  const res = await fetch('/api'+path, {
+    method: opts.method || 'GET',
+    headers: {'Content-Type':'application/json'},
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  let data = {};
+  try{ data = await res.json(); }catch(e){}
+  if(!res.ok){
+    const err = new Error(data.error || 'something went wrong');
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+/* =========================================================================
+   AUTH
+   ========================================================================= */
+function switchAuth(mode){
+  document.getElementById('tab-login').classList.toggle('active', mode==='login');
+  document.getElementById('tab-signup').classList.toggle('active', mode==='signup');
+  document.getElementById('form-login').classList.toggle('hidden', mode!=='login');
+  document.getElementById('form-signup').classList.toggle('hidden', mode!=='signup');
+}
+
+function validateUsername(){
+  const input = document.getElementById('su-username');
+  let v = input.value;
+  let cleaned = v.toLowerCase().replace(/[^a-z0-9_]/g,'');
+  if(cleaned !== v) input.value = cleaned;
+  v = cleaned;
+  const hint = document.getElementById('username-hint');
+  const btn = document.getElementById('su-submit');
+  if(v.length === 0){
+    hint.textContent = '2+ characters · lowercase letters, numbers, underscores only';
+    hint.className = 'field-hint';
+    btn.disabled = true;
+  } else if(v.length < 2){
+    hint.textContent = 'too short — needs at least 2 characters';
+    hint.className = 'field-hint err';
+    btn.disabled = true;
+  } else {
+    hint.textContent = '✓ @' + v + ' looks good';
+    hint.className = 'field-hint ok';
+    btn.disabled = false;
+  }
+}
+
+function showAuthError(id, msg){
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+function hideAuthError(id){
+  document.getElementById(id).classList.add('hidden');
+}
+
+async function doLogin(){
+  hideAuthError('login-error');
+  const username = document.getElementById('li-username').value.trim();
+  const password = document.getElementById('li-password').value;
+  if(!username || !password){ showAuthError('login-error','enter a username and password'); return; }
+  try{
+    const data = await api('/login', {method:'POST', body:{username, password}});
+    me = data.user;
+    enterApp();
+  }catch(e){
+    showAuthError('login-error', e.message);
+  }
+}
+
+async function doSignup(){
+  hideAuthError('signup-error');
+  const displayName = document.getElementById('su-display').value.trim();
+  const username = document.getElementById('su-username').value.trim();
+  const password = document.getElementById('su-password').value;
+  if(!username || !password){ showAuthError('signup-error','username and password are required'); return; }
+  try{
+    const data = await api('/signup', {method:'POST', body:{username, displayName, password}});
+    me = data.user;
+    enterApp();
+  }catch(e){
+    showAuthError('signup-error', e.message);
+  }
+}
+
+async function doLogout(){
+  try{ await api('/logout', {method:'POST'}); }catch(e){}
+  if(socket){ socket.disconnect(); socket=null; }
+  me = null;
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('view-login').classList.remove('hidden');
+  document.getElementById('li-username').value = '';
+  document.getElementById('li-password').value = '';
+}
+
+async function enterApp(){
+  document.getElementById('view-login').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('app').style.display = 'flex';
+
+  document.getElementById('me-avatar').setAttribute('style', avatarStyle(me,36)+'font-size:13px;');
+  document.getElementById('me-avatar').textContent = avatarText(me);
+  document.getElementById('me-name').innerHTML = esc(me.displayName) + ' ' + (me.role!=='user' ? `<span class="role-tag">${me.role==='owner'?'Owner':'Moderator'}</span>` : '');
+  document.getElementById('me-handle').textContent = '@'+me.username;
+  document.getElementById('composer-avatar').setAttribute('style', avatarStyle(me,42)+'font-size:14px;');
+  document.getElementById('composer-avatar').textContent = avatarText(me);
+
+  document.getElementById('nav-modtools').classList.toggle('hidden', me.role==='user');
+  document.getElementById('news-composer').classList.toggle('hidden', me.role==='user');
+
+  connectSocket();
+  await Promise.all([loadFeed(), loadTrendingSidebar(), loadSuggestedFollows(), loadNotifications(true)]);
+  goView('feed');
+}
+
+/* try to resume a session on page load */
+async function tryResume(){
+  try{
+    const data = await api('/me');
+    me = data.user;
+    await enterApp();
+  }catch(e){
+    // not logged in, stay on login screen
+  }
+}
+
+/* =========================================================================
+   SOCKET.IO
+   ========================================================================= */
+function connectSocket(){
+  socket = io();
+  socket.on('message', (msg)=>{
+    if(activeConversationId === msg.conversationId){
+      appendMessageBubble({
+        text: msg.text,
+        createdAt: msg.createdAt,
+        mine: msg.senderUsername === me.username,
+        senderUsername: msg.senderUsername,
+      });
+    }
+    if(document.getElementById('v-messages') && !document.getElementById('v-messages').classList.contains('hidden')){
+      loadConversations();
+    }
+  });
+}
+
+/* =========================================================================
+   NAV
+   ========================================================================= */
+function goView(name){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
+  ['feed','search','lives','messages','news','notifications','modtools','profile'].forEach(v=>{
+    document.getElementById('v-'+v).classList.toggle('hidden', v!==name);
+  });
+  document.getElementById('side-rail').style.display = (name==='feed') ? 'flex' : 'none';
+
+  if(name==='search') runSearch();
+  if(name==='messages') loadConversations();
+  if(name==='news') loadNews();
+  if(name==='notifications') loadNotifications(false).then(markNotificationsRead);
+  if(name==='modtools') loadModTools();
+  if(name==='profile') openProfile(me.username);
+}
+
+/* =========================================================================
+   FEED
+   ========================================================================= */
+async function loadFeed(){
+  const data = await api('/posts');
+  renderFeed(data.posts);
+}
+function renderFeed(posts){
+  const wrap = document.getElementById('feed-posts');
+  if(!posts.length){
+    wrap.innerHTML = `<div class="post"><div class="post-body" style="color:var(--text-faint);">no posts yet — be the first to post something.</div></div>`;
+    return;
+  }
+  wrap.innerHTML = posts.map(p=>`
+    <div class="post">
+      <div class="avatar" style="${avatarStyle(p.author,42)}font-size:13px;cursor:pointer;" onclick="openProfile('${p.author.username}')">${avatarText(p.author)}</div>
+      <div class="post-body">
+        <div class="post-head">
+          <span class="name" style="cursor:pointer;" onclick="openProfile('${p.author.username}')">${esc(p.author.displayName)}</span>
+          ${verifiedBadge(p.author.verified)}
+          <span class="handle">@${p.author.username}</span>
+          <span class="dot">·</span>
+          <span class="time">${timeAgo(p.createdAt)}</span>
+        </div>
+        <div class="post-text">${esc(p.text).replace(/#(\w+)/g,'<span class="tag">#$1</span>')}</div>
+        <div class="post-actions">
+          <button class="${p.likedByMe?'liked':''}" onclick="toggleLike('${p.id}', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 00-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 000-7.8z"/></svg><span>${p.likeCount}</span></button>
+          <button><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg><span>0</span></button>
+          <button><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg><span>share</span></button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+async function submitPost(){
+  const textarea = document.getElementById('composer-text');
+  const text = textarea.value.trim();
+  if(!text) return;
+  try{
+    await api('/posts', {method:'POST', body:{text}});
+    textarea.value = '';
+    loadFeed();
+    loadTrendingSidebar();
+  }catch(e){ alert(e.message); }
+}
+async function toggleLike(postId, btn){
+  try{
+    const data = await api('/posts/'+postId+'/like', {method:'POST'});
+    btn.classList.toggle('liked', data.likedByMe);
+    btn.querySelector('span').textContent = data.likeCount;
+  }catch(e){ alert(e.message); }
+}
+
+/* =========================================================================
+   TRENDING / SIDEBAR
+   ========================================================================= */
+async function loadTrendingSidebar(){
+  const data = await api('/trending');
+  const panel = document.getElementById('trend-panel');
+  if(!data.trending.length){
+    panel.innerHTML = `<div class="trend-row" style="color:var(--text-faint);">no trending hashtags yet — post with a #hashtag to start one.</div>`;
+  } else {
+    panel.innerHTML = data.trending.map(t=>`
+      <div class="trend-row">
+        <div class="cat">Trending</div>
+        <div class="tag">${t.tag.replace('#','<span>#</span>')}</div>
+        <div class="count">${t.count} post${t.count===1?'':'s'}</div>
+      </div>`).join('');
+  }
+  document.getElementById('live-panel').innerHTML = `<div class="live-mini" style="color:var(--text-faint);font-family:var(--font-mono);font-size:11.5px;">live streaming isn't wired up yet — this panel is still a preview.</div>`;
+}
+async function loadSuggestedFollows(){
+  const data = await api('/users/search?q=');
+  const others = data.users.filter(u=>u.username!==me.username).slice(0,4);
+  document.getElementById('follow-panel').innerHTML = others.length ? others.map(u=>`
+    <div class="follow-row">
+      <div class="avatar" style="${avatarStyle(u,34)}font-size:12px;cursor:pointer;" onclick="openProfile('${u.username}')">${avatarText(u)}</div>
+      <div class="fi" style="cursor:pointer;" onclick="openProfile('${u.username}')"><div class="fn">${esc(u.displayName)} ${verifiedBadge(u.verified)}</div><div class="fh">@${u.username}</div></div>
+      <button class="btn-follow" id="follow-btn-side-${u.username}" onclick="toggleFollowFromList('${u.username}', this)">${u.isFollowing?'Following':'Follow'}</button>
+    </div>`).join('') : `<div class="follow-row" style="color:var(--text-faint);">no other STAY accounts yet — invite people to join.</div>`;
+}
+
+/* =========================================================================
+   SEARCH
+   ========================================================================= */
+function runSearch(){
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(async ()=>{
+    const q = document.getElementById('search-input').value.trim();
+    const [trendData, userData] = await Promise.all([api('/trending'), api('/users/search?q='+encodeURIComponent(q))]);
+
+    document.getElementById('search-trend-grid').innerHTML = trendData.trending.length ? trendData.trending.map((t,i)=>`
+      <div class="trend-tile">
+        <div class="rank">#${i+1} · Trending</div>
+        <div class="name">${t.tag}</div>
+        <div class="meta">${t.count} post${t.count===1?'':'s'}</div>
+      </div>`).join('') : `<div style="color:var(--text-faint);font-size:13px;">no trending hashtags yet.</div>`;
+
+    const others = userData.users.filter(u=>u.username!==me.username);
+    document.getElementById('search-users').innerHTML = others.length ? others.map(u=>`
+      <div class="user-result">
+        <div class="avatar" style="${avatarStyle(u,38)}font-size:13px;cursor:pointer;" onclick="openProfile('${u.username}')">${avatarText(u)}</div>
+        <div class="fi" style="flex:1;cursor:pointer;" onclick="openProfile('${u.username}')"><div class="fn">${esc(u.displayName)} ${verifiedBadge(u.verified)}</div><div class="fh">@${u.username}</div></div>
+        <button class="btn-follow" id="follow-btn-search-${u.username}" onclick="toggleFollowFromList('${u.username}', this)">${u.isFollowing?'Following':'Follow'}</button>
+      </div>`).join('') : `<div style="color:var(--text-faint);font-size:13px;">no matching STAY accounts.</div>`;
+  }, 200);
+}
+async function toggleFollowFromList(username, btn){
+  try{
+    const data = await api('/users/'+username+'/follow', {method:'POST'});
+    btn.textContent = data.isFollowing ? 'Following' : 'Follow';
+  }catch(e){ alert(e.message); }
+}
+
+/* =========================================================================
+   LIVES (still a visual preview — no streaming backend yet)
+   ========================================================================= */
+function renderLivesPreview(){
+  const grid = document.getElementById('live-grid');
+  if(grid.dataset.rendered) return;
+  grid.dataset.rendered = '1';
+  grid.innerHTML = `<div style="grid-column:1/-1;color:var(--text-faint);font-family:var(--font-mono);font-size:12.5px;padding:10px 0;">live streaming isn't connected to a real broadcast backend yet — this page is still a visual preview.</div>`;
+}
+renderLivesPreview();
+
+/* =========================================================================
+   MESSAGES
+   ========================================================================= */
+async function loadConversations(){
+  const data = await api('/conversations');
+  lastConversations = data.conversations;
+  renderConvList(filterConvList(data.conversations));
+  if(!activeConversationId && data.conversations.length){
+    openConv(data.conversations[0].id, data.conversations[0].other);
+  } else if(!data.conversations.length){
+    document.getElementById('chat-name').textContent = '';
+    document.getElementById('chat-sub').textContent = '';
+    document.getElementById('chat-body').innerHTML = `<div style="color:var(--text-faint);font-family:var(--font-mono);font-size:12.5px;text-align:center;margin-top:40px;">no conversations yet — follow someone and message them from their profile.</div>`;
+  }
+}
+function filterConvList(conversations){
+  const q = (document.getElementById('conv-search-input')?.value || '').trim().toLowerCase();
+  if(!q) return conversations;
+  return conversations.filter(c => c.other.username.includes(q) || (c.other.displayName||'').toLowerCase().includes(q));
+}
+function filterConversations(){
+  renderConvList(filterConvList(lastConversations));
+}
+function renderConvList(conversations){
+  const wrap = document.getElementById('conv-items');
+  wrap.innerHTML = conversations.map(c=>`
+    <div class="conv-item ${c.id===activeConversationId?'active':''}" onclick='openConv(${JSON.stringify(c.id)}, ${JSON.stringify(c.other)})'>
+      <div class="avatar" style="${avatarStyle(c.other,40)}font-size:13px;">${avatarText(c.other)}</div>
+      <div class="ci">
+        <div class="cn">${esc(c.other.displayName)} ${verifiedBadge(c.other.verified)}</div>
+        <div class="cm">${c.lastMessage ? (c.lastMessage.mine?'you: ':'') + esc(c.lastMessage.text) : 'say hi 👋'}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+        <div class="ct">${c.lastMessage ? timeAgo(c.lastMessage.createdAt) : ''}</div>
+        ${c.unread ? `<div class="unread">${c.unread}</div>` : ''}
+      </div>
+    </div>`).join('');
+}
+async function openConv(id, other){
+  activeConversationId = id;
+  activeConversationOther = other;
+  if(socket) socket.emit('join', id);
+  document.getElementById('chat-avatar').setAttribute('style', avatarStyle(other,38)+'font-size:13px;');
+  document.getElementById('chat-avatar').textContent = avatarText(other);
+  document.getElementById('chat-name').innerHTML = esc(other.displayName) + ' ' + verifiedBadge(other.verified);
+  document.getElementById('chat-sub').textContent = '@'+other.username;
+
+  const data = await api('/conversations/'+id+'/messages');
+  const body = document.getElementById('chat-body');
+  body.innerHTML = data.messages.length ? data.messages.map(bubbleHtml).join('') : `<div style="color:var(--text-faint);font-family:var(--font-mono);font-size:12.5px;text-align:center;margin-top:20px;">no messages yet — say hi 👋</div>`;
+  body.scrollTop = body.scrollHeight;
+  loadConversations();
+}
+function bubbleHtml(m){
+  const who = m.mine ? me : activeConversationOther;
+  return `<div class="bubble-row ${m.mine?'me':''}">
+      <div class="avatar" style="${avatarStyle(who,28)}font-size:10px;">${avatarText(who)}</div>
+      <div>
+        <div class="bubble cut-sm">${esc(m.text)}</div>
+        <div class="bubble-meta">${new Date(m.createdAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</div>
+      </div>
+    </div>`;
+}
+function appendMessageBubble(m){
+  const body = document.getElementById('chat-body');
+  if(body.querySelector('div[style*="no messages yet"]')) body.innerHTML = '';
+  body.insertAdjacentHTML('beforeend', bubbleHtml(m));
+  body.scrollTop = body.scrollHeight;
+}
+async function sendMsg(){
+  const input = document.querySelector('.chat-input input');
+  const text = input.value.trim();
+  if(!text || !activeConversationId) return;
+  input.value = '';
+  try{
+    const data = await api('/conversations/'+activeConversationId+'/messages', {method:'POST', body:{text}});
+    appendMessageBubble(data.message);
+    loadConversations();
+  }catch(e){ alert(e.message); }
+}
+async function startConversationWith(username){
+  const data = await api('/conversations', {method:'POST', body:{username}});
+  goView('messages');
+  await loadConversations();
+  const userData = await api('/users/'+username);
+  openConv(data.conversationId, {username: userData.user.username, displayName: userData.user.displayName, verified: userData.user.verified});
+}
+
+/* =========================================================================
+   NEWS
+   ========================================================================= */
+async function loadNews(){
+  const data = await api('/news');
+  const wrap = document.getElementById('news-posts');
+  if(!data.news.length){
+    wrap.innerHTML = `<div class="news-post" style="border-left-color:var(--border);color:var(--text-faint);">no announcements yet.</div>`;
+    return;
+  }
+  wrap.innerHTML = data.news.map(n=>`
+    <div class="news-post">
+      <div class="news-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11a9 9 0 019 9"/><path d="M4 4a16 16 0 0116 16"/><circle cx="5" cy="19" r="1"/></svg>
+      </div>
+      <div class="post-body">
+        ${n.pinned ? `<div class="pin"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2 7h7l-5.5 4.5L17 21l-5-4-5 4 1.5-7.5L3 9h7z"/></svg>pinned</div>` : ''}
+        <div class="post-head">
+          <span class="name">STAYtion Team</span>
+          ${verifiedBadge(true)}
+          <span class="handle">@staytion</span>
+          <span class="dot">·</span>
+          <span class="time">${timeAgo(n.createdAt)}</span>
+        </div>
+        <div class="post-text" style="font-weight:600;margin-top:8px;">${esc(n.title)}</div>
+        ${n.body ? `<div class="post-text" style="color:var(--text-dim);">${esc(n.body)}</div>` : ''}
+      </div>
+    </div>`).join('');
+}
+async function postNews(){
+  const titleInput = document.getElementById('news-title-input');
+  const bodyInput = document.getElementById('news-input');
+  const title = titleInput.value.trim();
+  const body = bodyInput.value.trim();
+  if(!title && !body) return;
+  try{
+    await api('/news', {method:'POST', body:{title, body}});
+    titleInput.value = '';
+    bodyInput.value = '';
+    loadNews();
+  }catch(e){ alert(e.message); }
+}
+
+/* =========================================================================
+   NOTIFICATIONS
+   ========================================================================= */
+const notifIcons = {
+  like: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 00-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 000-7.8z"/></svg>',
+  follow: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="4"/><path d="M2 21c1.2-3.6 4-5 7-5s5.8 1.4 7 5"/><path d="M19 8v6"/><path d="M16 11h6"/></svg>',
+  verify: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>',
+  comment: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',
+};
+async function loadNotifications(silent){
+  const data = await api('/notifications');
+  const unreadCount = data.notifications.filter(n=>!n.read).length;
+  const badge = document.getElementById('notif-badge');
+  if(unreadCount>0){ badge.textContent = unreadCount; badge.classList.remove('hidden'); }
+  else{ badge.classList.add('hidden'); }
+  if(!silent) renderNotifications(data.notifications);
+  return data.notifications;
+}
+function renderNotifications(list){
+  const unread = list.filter(n=>!n.read);
+  const read = list.filter(n=>n.read);
+  let html = '';
+  if(!list.length){
+    html = `<div class="notif-row" style="color:var(--text-faint);">nothing yet — likes, follows, and verification updates will show up here.</div>`;
+  }
+  if(unread.length){ html += `<div class="notif-section-label">New</div>` + unread.map(rowNotif).join(''); }
+  if(read.length){ html += `<div class="notif-section-label">Earlier</div>` + read.map(rowNotif).join(''); }
+  document.getElementById('notif-list').innerHTML = html;
+}
+function rowNotif(n){
+  return `<div class="notif-row ${n.read?'':'unread'}">
+    <div class="notif-icon ${n.type}">${notifIcons[n.type]||notifIcons.comment}</div>
+    <div>
+      <div class="notif-text">${n.text}</div>
+      <div class="notif-time">${timeAgo(n.createdAt)}</div>
+    </div>
+  </div>`;
+}
+async function markNotificationsRead(){
+  await api('/notifications/read', {method:'POST'});
+  document.getElementById('notif-badge').classList.add('hidden');
+}
+
+/* =========================================================================
+   MOD TOOLS
+   ========================================================================= */
+async function loadModTools(){
+  const data = await api('/users/search?q=');
+  const list = data.users.filter(u=>u.username!==me.username);
+  document.getElementById('mod-user-list').innerHTML = list.length ? list.map(u=>`
+    <div class="mod-user-row">
+      <div class="avatar" style="${avatarStyle(u,38)}font-size:13px;cursor:pointer;" onclick="openProfile('${u.username}')">${avatarText(u)}</div>
+      <div class="mi">
+        <div class="mn">${esc(u.displayName)} ${verifiedBadge(u.verified)} ${u.role!=='user' ? `<span class="role-tag">${u.role==='owner'?'Owner':'Moderator'}</span>` : ''}</div>
+        <div class="mh">@${u.username}</div>
+        <div class="stats">${u.posts} posts · ${u.followers} followers</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        ${me.role==='owner' && u.role!=='owner' ? `<button class="btn-edit cut-sm" onclick="toggleModRole('${u.username}', '${u.role==='moderator'?'user':'moderator'}')">${u.role==='moderator'?'Remove Mod':'Make Mod'}</button>` : ''}
+        <button class="btn-verify ${u.verified?'granted':''}" onclick="grantVerification('${u.username}', this)" ${u.verified?'disabled':''}>
+          ${u.verified ? 'Verified' : 'Grant Verification'}
+        </button>
+      </div>
+    </div>`).join('') : `<div class="mod-user-row" style="color:var(--text-faint);">no other users yet.</div>`;
+}
+async function grantVerification(username, btn){
+  try{
+    await api('/users/'+username+'/verify', {method:'PATCH'});
+    btn.textContent = 'Verified';
+    btn.classList.add('granted');
+    btn.disabled = true;
+    loadModTools();
+  }catch(e){ alert(e.message); }
+}
+async function toggleModRole(username, role){
+  try{
+    await api('/users/'+username+'/role', {method:'PATCH', body:{role}});
+    loadModTools();
+  }catch(e){ alert(e.message); }
+}
+
+/* =========================================================================
+   PROFILE
+   ========================================================================= */
+async function openProfile(username){
+  goViewOnlyProfile();
+  viewingUsername = username;
+  const data = await api('/users/'+username);
+  const u = data.user;
+
+  const avatarEl = document.getElementById('profile-avatar');
+  avatarEl.setAttribute('style', avatarStyle(u, 104) + 'position:relative;');
+  const avatarHint = document.getElementById('avatar-edit-hint');
+  avatarEl.querySelectorAll('.avatar-text-node').forEach(n=>n.remove());
+  if(!u.avatarUrl){
+    const span = document.createElement('span');
+    span.className = 'avatar-text-node';
+    span.textContent = initials(u.displayName);
+    avatarEl.insertBefore(span, avatarHint);
+  }
+  avatarHint.classList.toggle('hidden', !u.isMe);
+
+  const bannerEl = document.getElementById('profile-banner');
+  if(u.bannerUrl){
+    bannerEl.style.backgroundImage = `url('${u.bannerUrl.replace(/'/g,'%27')}')`;
+    bannerEl.style.backgroundSize = 'cover';
+    bannerEl.style.backgroundPosition = 'center';
+  } else {
+    bannerEl.style.backgroundImage = '';
+    bannerEl.style.background = 'linear-gradient(120deg,#ff5a1f 0%, #7a2c10 45%, #0a0a0b 100%)';
+  }
+  document.getElementById('banner-edit-hint').classList.toggle('hidden', !u.isMe);
+
+  document.getElementById('profile-name-line').innerHTML = esc(u.displayName) + ' ' + verifiedBadge(u.verified) + (u.role!=='user' ? ` <span class="role-tag">${u.role==='owner'?'Owner':'Moderator'}</span>` : '');
+  document.getElementById('profile-handle-line').textContent = '@'+u.username + ' · joined ' + new Date(u.createdAt).toLocaleDateString([], {month:'short', year:'numeric'});
+  document.getElementById('profile-bio-line').textContent = u.bio || (u.isMe ? 'add a bio from Edit Profile' : '');
+  document.getElementById('profile-stats-line').innerHTML = `
+    <div><b>${u.posts}</b><span>posts</span></div>
+    <div><b>${u.followers}</b><span>followers</span></div>
+    <div><b>${u.following}</b><span>following</span></div>`;
+
+  const actions = document.getElementById('profile-actions');
+  if(u.isMe){
+    actions.innerHTML = `<button class="btn-edit cut-sm" onclick="openEditProfile()">Edit Profile</button><button class="btn-edit cut-sm" onclick="doLogout()">Log Out</button>`;
+  } else {
+    actions.innerHTML = `
+      <button class="btn-follow" id="profile-follow-btn" onclick="toggleFollowProfile('${u.username}')" style="padding:9px 18px;">${u.isFollowing?'Following':'Follow'}</button>
+      <button class="btn-edit cut-sm" onclick="startConversationWith('${u.username}')">Message</button>`;
+  }
+  closeEditProfile();
+
+  const postsData = await api('/posts');
+  const mine = postsData.posts.filter(p=>p.author.username===u.username);
+  const wrap = document.getElementById('profile-posts');
+  wrap.innerHTML = mine.length ? mine.map(p=>`
+    <div class="post" style="padding-left:0;padding-right:0;">
+      <div class="avatar" style="${avatarStyle(u,38)}font-size:13px;">${avatarText(u)}</div>
+      <div class="post-body">
+        <div class="post-head"><span class="name">${esc(u.displayName)}</span> ${verifiedBadge(u.verified)} <span class="dot">·</span> <span class="time">${timeAgo(p.createdAt)}</span></div>
+        <div class="post-text">${esc(p.text).replace(/#(\w+)/g,'<span class="tag">#$1</span>')}</div>
+        <div class="post-actions"><button class="${p.likedByMe?'liked':''}" onclick="toggleLike('${p.id}', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 00-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 000-7.8z"/></svg><span>${p.likeCount}</span></button></div>
+      </div>
+    </div>`).join('') : `<div style="padding:20px 0;color:var(--text-faint);font-size:13.5px;">no posts yet.</div>`;
+}
+function goViewOnlyProfile(){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view==='profile'));
+  ['feed','search','lives','messages','news','notifications','modtools','profile'].forEach(v=>{
+    document.getElementById('v-'+v).classList.toggle('hidden', v!=='profile');
+  });
+  document.getElementById('side-rail').style.display = 'none';
+}
+async function toggleFollowProfile(username){
+  const data = await api('/users/'+username+'/follow', {method:'POST'});
+  document.getElementById('profile-follow-btn').textContent = data.isFollowing ? 'Following' : 'Follow';
+  openProfile(username);
+}
+function triggerAvatarUpload(){
+  document.getElementById('avatar-file-input').click();
+}
+function triggerBannerUpload(){
+  document.getElementById('banner-file-input').click();
+}
+function compressImageFile(file, maxW, maxH, quality){
+  return new Promise((resolve, reject)=>{
+    if(!file || !file.type.startsWith('image/')){ reject(new Error('please choose an image file')); return; }
+    const reader = new FileReader();
+    reader.onerror = ()=>reject(new Error('could not read that file'));
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onerror = ()=>reject(new Error('could not read that image'));
+      img.onload = ()=>{
+        let { width, height } = img;
+        const scale = Math.min(1, maxW/width, maxH/height);
+        width = Math.round(width*scale);
+        height = Math.round(height*scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+async function handleAvatarFile(event){
+  const file = event.target.files[0];
+  event.target.value = '';
+  if(!file) return;
+  try{
+    const dataUrl = await compressImageFile(file, 480, 480, 0.85);
+    const data = await api('/me', {method:'PATCH', body:{avatarUrl: dataUrl}});
+    me = data.user;
+    document.getElementById('me-avatar').setAttribute('style', avatarStyle(me,36)+'font-size:13px;');
+    document.getElementById('me-avatar').textContent = avatarText(me);
+    document.getElementById('composer-avatar').setAttribute('style', avatarStyle(me,42)+'font-size:14px;');
+    document.getElementById('composer-avatar').textContent = avatarText(me);
+    openProfile(me.username);
+  }catch(e){ alert(e.message); }
+}
+async function handleBannerFile(event){
+  const file = event.target.files[0];
+  event.target.value = '';
+  if(!file) return;
+  try{
+    const dataUrl = await compressImageFile(file, 1400, 400, 0.82);
+    const data = await api('/me', {method:'PATCH', body:{bannerUrl: dataUrl}});
+    me = data.user;
+    openProfile(me.username);
+  }catch(e){ alert(e.message); }
+}
+function openEditProfile(){
+  document.getElementById('edit-display-name').value = me.displayName;
+  document.getElementById('edit-bio').value = me.bio || '';
+  document.getElementById('profile-edit-form').classList.remove('hidden');
+}
+function closeEditProfile(){
+  document.getElementById('profile-edit-form').classList.add('hidden');
+}
+async function saveProfileEdits(){
+  const displayName = document.getElementById('edit-display-name').value.trim();
+  const bio = document.getElementById('edit-bio').value.trim();
+  try{
+    const data = await api('/me', {method:'PATCH', body:{displayName, bio}});
+    me = data.user;
+    document.getElementById('me-name').innerHTML = esc(me.displayName) + ' ' + (me.role!=='user' ? `<span class="role-tag">${me.role==='owner'?'Owner':'Moderator'}</span>` : '');
+    closeEditProfile();
+    openProfile(me.username);
+  }catch(e){ alert(e.message); }
+}
+
+/* =========================================================================
+   INIT
+   ========================================================================= */
+tryResume();
+</script>
+</body>
+</html>
