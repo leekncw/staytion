@@ -809,6 +809,9 @@ function switchAuth(mode){
   document.getElementById('form-signup').classList.toggle('hidden', mode!=='signup');
 }
 
+let usernameCheckDebounce = null;
+let usernameCheckToken = 0;
+
 function validateUsername(){
   const input = document.getElementById('su-username');
   let v = input.value;
@@ -817,19 +820,47 @@ function validateUsername(){
   v = cleaned;
   const hint = document.getElementById('username-hint');
   const btn = document.getElementById('su-submit');
+  clearTimeout(usernameCheckDebounce);
+
   if(v.length === 0){
     hint.textContent = '2+ characters · lowercase letters, numbers, underscores only';
     hint.className = 'field-hint';
     btn.disabled = true;
-  } else if(v.length < 2){
+    return;
+  }
+  if(v.length < 2){
     hint.textContent = 'too short — needs at least 2 characters';
     hint.className = 'field-hint err';
     btn.disabled = true;
-  } else {
-    hint.textContent = '✓ @' + v + ' looks good';
-    hint.className = 'field-hint ok';
-    btn.disabled = false;
+    return;
   }
+
+  hint.textContent = 'checking availability...';
+  hint.className = 'field-hint';
+  btn.disabled = true;
+
+  const myToken = ++usernameCheckToken;
+  usernameCheckDebounce = setTimeout(async ()=>{
+    try{
+      const res = await fetch('/api/username-available/'+encodeURIComponent(v));
+      const data = await res.json();
+      if(myToken !== usernameCheckToken) return; // a newer keystroke already superseded this check
+      if(data.available){
+        hint.textContent = '✓ @' + v + ' is available';
+        hint.className = 'field-hint ok';
+        btn.disabled = false;
+      } else {
+        hint.textContent = '✗ @' + v + ' is already taken';
+        hint.className = 'field-hint err';
+        btn.disabled = true;
+      }
+    }catch(e){
+      if(myToken !== usernameCheckToken) return;
+      hint.textContent = 'could not check availability — try again';
+      hint.className = 'field-hint err';
+      btn.disabled = true;
+    }
+  }, 350);
 }
 
 function showAuthError(id, msg){
@@ -1285,10 +1316,15 @@ async function toggleModRole(username, role){
 /* =========================================================================
    PROFILE
    ========================================================================= */
+let profileRequestToken = 0;
+
 async function openProfile(username){
   goViewOnlyProfile();
   viewingUsername = username;
+  const myToken = ++profileRequestToken;
+
   const data = await api('/users/'+username);
+  if(myToken !== profileRequestToken) return; // a newer profile click superseded this one — don't render stale data
   const u = data.user;
 
   const avatarEl = document.getElementById('profile-avatar');
@@ -1333,6 +1369,7 @@ async function openProfile(username){
   closeEditProfile();
 
   const postsData = await api('/posts');
+  if(myToken !== profileRequestToken) return; // still guard after the second await
   const mine = postsData.posts.filter(p=>p.author.username===u.username);
   const wrap = document.getElementById('profile-posts');
   wrap.innerHTML = mine.length ? mine.map(p=>`

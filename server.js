@@ -93,6 +93,17 @@ function findUserByUsername(username) {
 // auth
 // ---------------------------------------------------------------------------
 
+// Public on purpose - needed while filling out the signup form, before any
+// session exists. Only ever returns a boolean, nothing else about the account.
+app.get('/api/username-available/:username', (req, res) => {
+  const username = String(req.params.username || '').toLowerCase();
+  if (!/^[a-z0-9_]{2,}$/.test(username)) {
+    return res.json({ available: false, valid: false });
+  }
+  const taken = !!findUserByUsername(username);
+  res.json({ available: !taken, valid: true });
+});
+
 app.post('/api/signup', (req, res) => {
   let { username, displayName, password } = req.body || {};
   if (!username || !password) {
