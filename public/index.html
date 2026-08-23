@@ -21,10 +21,29 @@
     --accent-dim:#7a2c10;
     --accent-glow:rgba(255,90,31,.35);
     --error-red:#ff3b5c;
+    --overlay-bg:rgba(10,10,11,.88);
     --font-display:'Space Grotesk',sans-serif;
     --font-body:'Inter',sans-serif;
     --font-mono:'Space Mono',monospace;
   }
+  body.light{
+    --bg:#f6f5f3;
+    --bg-elev:#ffffff;
+    --surface:#efeeec;
+    --surface-2:#e4e2df;
+    --border:#dcdad6;
+    --text:#16161a;
+    --text-dim:#55555c;
+    --text-faint:#8d8d94;
+    --accent:#ff5a1f;
+    --accent-2:#e64f1c;
+    --accent-dim:#ffd9c2;
+    --accent-glow:rgba(255,90,31,.18);
+    --error-red:#d92c48;
+    --overlay-bg:rgba(246,245,243,.88);
+  }
+  body.light .scan-bg{ display:none; }
+  body.light ::selection{ background:var(--accent); color:#fff; }
   *{box-sizing:border-box;margin:0;padding:0;}
   html,body{height:100%;}
   body{
@@ -197,7 +216,7 @@
   .view-inner{ max-width:640px; margin:0 auto; padding:0 0 60px; }
 
   .topbar{
-    position:sticky; top:0; z-index:5; background:rgba(10,10,11,.88); backdrop-filter:blur(10px);
+    position:sticky; top:0; z-index:5; background:var(--overlay-bg); backdrop-filter:blur(10px);
     border-bottom:1px solid var(--border); padding:16px 24px;
   }
   .topbar h1{ font-family:var(--font-display); font-size:18px; letter-spacing:.5px; }
@@ -378,6 +397,22 @@
   .send-btn{ background:var(--accent); color:#0a0a0b; padding:13px 18px; display:flex; align-items:center; justify-content:center; }
   .send-btn:hover{ filter:brightness(1.1); }
 
+  /* ============ SETTINGS VIEW ============ */
+  .settings-section{ padding:22px 24px; border-bottom:1px solid var(--border); }
+  .settings-section h3{ font-family:var(--font-display); font-size:14px; text-transform:uppercase; letter-spacing:1px; color:var(--text-dim); margin-bottom:16px; }
+  .settings-row{ display:flex; align-items:center; justify-content:space-between; }
+  .settings-row-title{ font-size:14px; font-weight:600; }
+  .settings-row-sub{ font-size:12.5px; color:var(--text-faint); margin-top:2px; }
+  .theme-toggle{
+    width:46px; height:26px; border-radius:14px; background:var(--surface-2); border:1px solid var(--border);
+    position:relative; flex-shrink:0; transition:background .15s;
+  }
+  .theme-toggle-knob{
+    position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%;
+    background:var(--text-dim); transition:transform .15s, background .15s;
+  }
+  body.light .theme-toggle-knob{ transform:translateX(20px); background:var(--accent); }
+
   /* ============ PROFILE VIEW ============ */
   .banner{ height:190px; }
   .banner-edit-hint{
@@ -545,6 +580,12 @@
 </style>
 </head>
 <body>
+<script>
+  // applied immediately, before the rest of the page renders, to avoid a flash of the wrong theme
+  if(localStorage.getItem('staytion-theme') === 'light'){
+    document.body.classList.add('light');
+  }
+</script>
 
 <div class="scan-bg"></div>
 
@@ -630,6 +671,10 @@
     <div class="nav-item hidden" data-view="modtools" id="nav-modtools" onclick="goView('modtools')">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/></svg>
       <span class="label">Mod Tools</span>
+    </div>
+    <div class="nav-item" data-view="settings" onclick="goView('settings')">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span class="label">Settings</span>
     </div>
     <div class="nav-item" data-view="profile" onclick="goView('profile')">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4.5 5-6 8-6s6.5 1.5 8 6"/></svg>
@@ -775,6 +820,57 @@
       <div id="mod-user-list"></div>
     </div>
 
+    <!-- ============ SETTINGS VIEW ============ -->
+    <div class="view hidden" id="v-settings">
+      <div class="topbar"><h1>Settings</h1><div class="sub">account &amp; appearance</div></div>
+      <div class="view-inner" style="max-width:520px;">
+
+        <div class="settings-section">
+          <h3>Appearance</h3>
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-title">Theme</div>
+              <div class="settings-row-sub">switch between dark and light mode</div>
+            </div>
+            <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">
+              <span class="theme-toggle-knob"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3>Change Username</h3>
+          <div class="field">
+            <label>New Username</label>
+            <div class="input-box"><span class="prefix">@</span><input id="settings-username" type="text" placeholder="lowercase, 2+ chars" autocomplete="off" oninput="validateSettingsUsername()"></div>
+            <div class="field-hint" id="settings-username-hint">2+ characters · lowercase letters, numbers, underscores only</div>
+          </div>
+          <button class="btn-primary" id="settings-username-submit" disabled onclick="saveUsername()" style="width:auto;padding:11px 22px;">Save Username</button>
+        </div>
+
+        <div class="settings-section">
+          <h3>Change Password</h3>
+          <div class="field">
+            <label>Current Password</label>
+            <div class="input-box"><input id="settings-current-password" type="password" placeholder="••••••••"></div>
+          </div>
+          <div class="field">
+            <label>New Password</label>
+            <div class="input-box"><input id="settings-new-password" type="password" placeholder="••••••••"></div>
+          </div>
+          <div class="field-hint err hidden" id="settings-password-error"></div>
+          <div class="field-hint ok hidden" id="settings-password-success"></div>
+          <button class="btn-primary" onclick="savePassword()" style="width:auto;padding:11px 22px;">Update Password</button>
+        </div>
+
+        <div class="settings-section">
+          <h3>Account</h3>
+          <button class="btn-edit cut-sm" onclick="doLogout()">Log Out</button>
+        </div>
+
+      </div>
+    </div>
+
     <!-- ============ PROFILE VIEW ============ -->
     <div class="view hidden" id="v-profile">
       <input type="file" id="banner-file-input" accept="image/*" class="hidden" onchange="handleBannerFile(event)">
@@ -793,7 +889,6 @@
         </div>
         <div class="profile-actions" id="profile-actions">
           <button class="btn-edit cut-sm" onclick="openEditProfile()">Edit Profile</button>
-          <button class="btn-edit cut-sm" onclick="doLogout()">Log Out</button>
         </div>
         <div class="profile-name" id="profile-name-line"></div>
         <div class="profile-handle" id="profile-handle-line"></div>
@@ -816,9 +911,9 @@
 
         <div class="profile-stats" id="profile-stats-line"></div>
         <div class="profile-tabs">
-          <button class="active">Posts</button>
-          <button>Media</button>
-          <button>Likes</button>
+          <button class="active" data-tab="posts" onclick="setProfileTab('posts')">Posts</button>
+          <button data-tab="media" onclick="setProfileTab('media')">Media</button>
+          <button data-tab="likes" onclick="setProfileTab('likes')">Likes</button>
         </div>
         <div id="profile-posts"></div>
       </div>
@@ -1084,7 +1179,7 @@ function connectSocket(){
    ========================================================================= */
 function goView(name){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
-  ['feed','search','messages','news','notifications','modtools','profile'].forEach(v=>{
+  ['feed','search','messages','news','notifications','modtools','settings','profile'].forEach(v=>{
     document.getElementById('v-'+v).classList.toggle('hidden', v!==name);
   });
   document.getElementById('side-rail').style.display = (name==='feed') ? 'flex' : 'none';
@@ -1683,6 +1778,8 @@ async function toggleModRole(username, role){
    PROFILE
    ========================================================================= */
 let profileRequestToken = 0;
+let profileAllPostsCache = []; // this profile owner's posts, cached so tab switches don't refetch
+let currentProfileTab = 'posts'; // 'posts' | 'media' | 'likes'
 
 async function openProfile(username){
   goViewOnlyProfile();
@@ -1726,7 +1823,7 @@ async function openProfile(username){
 
   const actions = document.getElementById('profile-actions');
   if(u.isMe){
-    actions.innerHTML = `<button class="btn-edit cut-sm" onclick="openEditProfile()">Edit Profile</button><button class="btn-edit cut-sm" onclick="doLogout()">Log Out</button>`;
+    actions.innerHTML = `<button class="btn-edit cut-sm" onclick="openEditProfile()">Edit Profile</button>`;
   } else {
     actions.innerHTML = `
       <button class="btn-follow" id="profile-follow-btn" onclick="toggleFollowProfile('${u.username}')" style="padding:9px 18px;">${u.isFollowing?'Following':'Follow'}</button>
@@ -1736,13 +1833,61 @@ async function openProfile(username){
 
   const postsData = await api('/posts');
   if(myToken !== profileRequestToken) return; // still guard after the second await
-  const mine = postsData.posts.filter(p=>p.author.username===u.username);
-  const wrap = document.getElementById('profile-posts');
-  wrap.innerHTML = mine.length ? mine.map(renderPostCard).join('') : `<div style="padding:20px 0;color:var(--text-faint);font-size:13.5px;">no posts yet.</div>`;
+  profileAllPostsCache = postsData.posts.filter(p=>p.author.username===u.username);
+  currentProfileTab = 'posts';
+  document.querySelectorAll('.profile-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab==='posts'));
+  renderProfileTabContent();
 }
+function setProfileTab(tab){
+  currentProfileTab = tab;
+  document.querySelectorAll('.profile-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  renderProfileTabContent();
+}
+async function renderProfileTabContent(){
+  const wrap = document.getElementById('profile-posts');
+  const emptyMsg = (text)=>`<div style="padding:20px 0;color:var(--text-faint);font-size:13.5px;">${text}</div>`;
+
+  if(currentProfileTab === 'posts'){
+    wrap.innerHTML = profileAllPostsCache.length ? profileAllPostsCache.map(renderPostCard).join('') : emptyMsg('no posts yet.');
+    return;
+  }
+
+  if(currentProfileTab === 'media'){
+    const withMedia = profileAllPostsCache.filter(p=>p.media);
+    wrap.innerHTML = withMedia.length
+      ? `<div class="profile-grid">${withMedia.map(renderMediaGridCell).join('')}</div>`
+      : emptyMsg('no photos or videos yet.');
+    return;
+  }
+
+  if(currentProfileTab === 'likes'){
+    wrap.innerHTML = emptyMsg('loading...');
+    const tabToken = profileRequestToken;
+    const data = await api('/users/'+viewingUsername+'/liked-posts');
+    if(tabToken !== profileRequestToken || currentProfileTab !== 'likes') return; // profile or tab changed while loading
+    wrap.innerHTML = data.posts.length ? data.posts.map(renderPostCard).join('') : emptyMsg('hasn\'t liked anything yet.');
+  }
+}
+function renderMediaGridCell(p){
+  const inner = p.media.type === 'video'
+    ? `<video src="/api/media/${p.media.id}" muted style="width:100%;height:100%;object-fit:cover;"></video>`
+    : `<img src="/api/media/${p.media.id}" style="width:100%;height:100%;object-fit:cover;">`;
+  const playIcon = p.media.type === 'video'
+    ? `<div class="pin" style="background:rgba(10,10,11,.6);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div>`
+    : '';
+  return `<div class="cell" style="cursor:pointer;" onclick="viewPostFromGrid('${p.id}')">${inner}${playIcon}</div>`;
+}
+function viewPostFromGrid(postId){
+  setProfileTab('posts');
+  setTimeout(()=>{
+    const el = document.getElementById('post-'+postId);
+    if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
+  }, 60);
+}
+
 function goViewOnlyProfile(){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view==='profile'));
-  ['feed','search','messages','news','notifications','modtools','profile'].forEach(v=>{
+  ['feed','search','messages','news','notifications','modtools','settings','profile'].forEach(v=>{
     document.getElementById('v-'+v).classList.toggle('hidden', v!=='profile');
   });
   document.getElementById('side-rail').style.display = 'none';
@@ -1807,6 +1952,113 @@ async function handleBannerFile(event){
     openProfile(me.username);
   }catch(e){ alert(e.message); }
 }
+/* ---------------- THEME ---------------- */
+function toggleTheme(){
+  const isLight = document.body.classList.toggle('light');
+  localStorage.setItem('staytion-theme', isLight ? 'light' : 'dark');
+}
+
+/* ---------------- SETTINGS: USERNAME ---------------- */
+let settingsUsernameDebounce = null;
+let settingsUsernameToken = 0;
+function validateSettingsUsername(){
+  const input = document.getElementById('settings-username');
+  let v = input.value;
+  let cleaned = v.toLowerCase().replace(/[^a-z0-9_]/g,'');
+  if(cleaned !== v) input.value = cleaned;
+  v = cleaned;
+  const hint = document.getElementById('settings-username-hint');
+  const btn = document.getElementById('settings-username-submit');
+  clearTimeout(settingsUsernameDebounce);
+
+  if(v.length === 0){
+    hint.textContent = '2+ characters · lowercase letters, numbers, underscores only';
+    hint.className = 'field-hint';
+    btn.disabled = true;
+    return;
+  }
+  if(v === me.username){
+    hint.textContent = 'that\'s already your username';
+    hint.className = 'field-hint';
+    btn.disabled = true;
+    return;
+  }
+  if(v.length < 2){
+    hint.textContent = 'too short — needs at least 2 characters';
+    hint.className = 'field-hint err';
+    btn.disabled = true;
+    return;
+  }
+
+  hint.textContent = 'checking availability...';
+  hint.className = 'field-hint';
+  btn.disabled = true;
+
+  const myToken = ++settingsUsernameToken;
+  settingsUsernameDebounce = setTimeout(async ()=>{
+    try{
+      const res = await fetch('/api/username-available/'+encodeURIComponent(v));
+      const data = await res.json();
+      if(myToken !== settingsUsernameToken) return;
+      if(data.available){
+        hint.textContent = '✓ @' + v + ' is available';
+        hint.className = 'field-hint ok';
+        btn.disabled = false;
+      } else {
+        hint.textContent = '✗ @' + v + ' is already taken';
+        hint.className = 'field-hint err';
+        btn.disabled = true;
+      }
+    }catch(e){
+      if(myToken !== settingsUsernameToken) return;
+      hint.textContent = 'could not check availability — try again';
+      hint.className = 'field-hint err';
+      btn.disabled = true;
+    }
+  }, 350);
+}
+async function saveUsername(){
+  const input = document.getElementById('settings-username');
+  const newUsername = input.value.trim();
+  if(!newUsername) return;
+  try{
+    const data = await api('/me/username', {method:'PATCH', body:{newUsername}});
+    me = data.user;
+    document.getElementById('me-name').innerHTML = esc(me.displayName) + (me.role!=='user' ? ` <span class="role-tag">${me.role==='owner'?'Owner':'Moderator'}</span>` : '');
+    document.getElementById('me-handle').textContent = '@'+me.username;
+    input.value = '';
+    document.getElementById('settings-username-hint').textContent = '✓ username updated to @'+me.username;
+    document.getElementById('settings-username-hint').className = 'field-hint ok';
+    document.getElementById('settings-username-submit').disabled = true;
+  }catch(e){ alert(e.message); }
+}
+
+/* ---------------- SETTINGS: PASSWORD ---------------- */
+async function savePassword(){
+  const currentPassword = document.getElementById('settings-current-password').value;
+  const newPassword = document.getElementById('settings-new-password').value;
+  const errEl = document.getElementById('settings-password-error');
+  const okEl = document.getElementById('settings-password-success');
+  errEl.classList.add('hidden');
+  okEl.classList.add('hidden');
+
+  if(!currentPassword || !newPassword){
+    errEl.textContent = 'both fields are required';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  try{
+    await api('/me/password', {method:'PATCH', body:{currentPassword, newPassword}});
+    document.getElementById('settings-current-password').value = '';
+    document.getElementById('settings-new-password').value = '';
+    okEl.textContent = '✓ password updated';
+    okEl.classList.remove('hidden');
+  }catch(e){
+    errEl.textContent = e.message;
+    errEl.classList.remove('hidden');
+  }
+}
+
 function openEditProfile(){
   document.getElementById('edit-display-name').value = me.displayName;
   document.getElementById('edit-bio').value = me.bio || '';

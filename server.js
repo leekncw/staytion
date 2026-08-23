@@ -180,6 +180,20 @@ app.get('/api/users/:username', requireAuth, (req, res) => {
   res.json({ user: { ...publicUser(u), isFollowing, isMe: u.id === me.id } });
 });
 
+app.get('/api/users/:username/liked-posts', requireAuth, (req, res) => {
+  const target = findUserByUsername(req.params.username);
+  if (!target) return res.status(404).json({ error: 'user not found' });
+  const me = currentUser(req);
+  const theirLikes = db.data.likes
+    .filter((l) => l.userId === target.id)
+    .sort((a, b) => b.createdAt - a.createdAt);
+  const posts = theirLikes
+    .map((l) => db.data.posts.find((p) => p.id === l.postId))
+    .filter(Boolean)
+    .map((p) => serializePost(p, me));
+  res.json({ posts });
+});
+
 const MAX_IMAGE_DATA_URL_LENGTH = 3.5 * 1024 * 1024; // ~3.5MB of base64 text, plenty for a compressed jpeg
 
 app.patch('/api/me', requireAuth, (req, res) => {
@@ -209,6 +223,43 @@ app.patch('/api/me', requireAuth, (req, res) => {
 
   db.save();
   res.json({ user: publicUser(me) });
+});
+
+app.patch('/api/me/username', requireAuth, (req, res) => {
+  const me = currentUser(req);
+  let newUsername = String((req.body || {}).newUsername || '').toLowerCase().trim();
+
+  if (newUsername === me.username) {
+    return res.status(400).json({ error: 'that\'s already your username' });
+  }
+  if (!/^[a-z0-9_]{2,}$/.test(newUsername)) {
+    return res.status(400).json({
+      error: 'username must be lowercase, 2+ characters, and only letters/numbers/underscores',
+    });
+  }
+  if (findUserByUsername(newUsername)) {
+    return res.status(400).json({ error: 'that username is already taken' });
+  }
+
+  me.username = newUsername;
+  db.save();
+  res.json({ user: publicUser(me) });
+});
+
+app.patch('/api/me/password', requireAuth, (req, res) => {
+  const me = currentUser(req);
+  const { currentPassword, newPassword } = req.body || {};
+
+  if (!bcrypt.compareSync(String(currentPassword || ''), me.passwordHash)) {
+    return res.status(401).json({ error: 'current password is incorrect' });
+  }
+  if (String(newPassword || '').length < 4) {
+    return res.status(400).json({ error: 'new password must be at least 4 characters' });
+  }
+
+  me.passwordHash = bcrypt.hashSync(String(newPassword), 10);
+  db.save();
+  res.json({ ok: true });
 });
 
 app.post('/api/users/:username/follow', requireAuth, (req, res) => {
