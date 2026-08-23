@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0a0a0b;
+    --bg:#000000;
     --bg-elev:#141417;
     --surface:#1b1b1f;
     --surface-2:#222226;
@@ -1815,7 +1815,7 @@ async function openProfile(username){
 
   document.getElementById('profile-name-line').innerHTML = esc(u.displayName) + ' ' + verifiedBadge(u.verified) + (u.role!=='user' ? ` <span class="role-tag">${u.role==='owner'?'Owner':'Moderator'}</span>` : '');
   document.getElementById('profile-handle-line').textContent = '@'+u.username + ' · joined ' + new Date(u.createdAt).toLocaleDateString([], {month:'short', year:'numeric'});
-  document.getElementById('profile-bio-line').textContent = u.bio || (u.isMe ? 'add a bio from Edit Profile' : '');
+  document.getElementById('profile-bio-line').textContent = u.bio || '';
   document.getElementById('profile-stats-line').innerHTML = `
     <div><b>${u.posts}</b><span>posts</span></div>
     <div><b>${u.followers}</b><span>followers</span></div>
