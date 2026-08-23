@@ -258,6 +258,46 @@
   .post-actions button:hover{ color:var(--accent); }
   .post-actions button.liked{ color:var(--accent); }
 
+  /* post owner menu (edit/delete) */
+  .post-menu-wrap{ position:relative; margin-left:auto; }
+  .post-menu-btn{ color:var(--text-faint); padding:4px; }
+  .post-menu-btn:hover{ color:var(--text); }
+  .post-menu-dropdown{
+    position:absolute; right:0; top:100%; margin-top:4px; background:var(--bg-elev); border:1px solid var(--border);
+    min-width:120px; z-index:10; box-shadow:0 8px 24px rgba(0,0,0,.4);
+  }
+  .post-menu-dropdown button{
+    display:block; width:100%; text-align:left; padding:9px 14px; font-size:13px; color:var(--text);
+  }
+  .post-menu-dropdown button:hover{ background:var(--surface); }
+  .post-menu-dropdown button.danger{ color:var(--error-red); }
+
+  /* inline edit mode */
+  .post-edit-box textarea{
+    width:100%; min-height:60px; font-size:14.5px; line-height:1.55; background:var(--surface);
+    border:1px solid var(--accent); padding:10px 12px; resize:vertical;
+  }
+  .post-edit-actions{ display:flex; gap:8px; margin-top:8px; justify-content:flex-end; }
+  .post-edit-actions button{
+    font-family:var(--font-mono); font-size:11.5px; padding:6px 14px; text-transform:uppercase;
+  }
+  .post-edit-actions .save{ background:var(--accent); color:#0a0a0b; font-weight:700; }
+  .post-edit-actions .cancel{ border:1px solid var(--border); color:var(--text-dim); }
+  .edited-tag{ color:var(--text-faint); font-size:11.5px; font-family:var(--font-mono); }
+
+  /* comments */
+  .comments-panel{ margin-top:14px; border-top:1px solid var(--border); padding-top:12px; }
+  .comment-row{ display:flex; gap:9px; margin-bottom:12px; }
+  .comment-bubble{ background:var(--surface); border:1px solid var(--border); padding:8px 12px; flex:1; }
+  .comment-bubble .cn{ font-size:12.5px; font-weight:700; display:flex; align-items:center; gap:5px; }
+  .comment-bubble .ct{ font-size:13.5px; margin-top:2px; line-height:1.5; }
+  .comment-meta{ display:flex; gap:10px; margin-top:3px; }
+  .comment-meta span{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); }
+  .comment-meta button.danger{ color:var(--error-red); font-family:var(--font-mono); font-size:10.5px; }
+  .comment-composer{ display:flex; gap:8px; align-items:center; margin-top:6px; }
+  .comment-composer input{ flex:1; background:var(--surface); border:1px solid var(--border); padding:9px 12px; font-size:13.5px; }
+  .comment-composer button{ background:var(--accent); color:#0a0a0b; font-family:var(--font-mono); font-size:11.5px; padding:9px 14px; text-transform:uppercase; }
+
   /* right rail */
   .side-rail{ width:320px; flex-shrink:0; border-left:1px solid var(--border); padding:20px; overflow-y:auto; display:flex; flex-direction:column; gap:20px; }
   .panel{ border:1px solid var(--border); background:var(--bg-elev); }
@@ -964,6 +1004,7 @@ function connectSocket(){
   socket.on('message', (msg)=>{
     if(activeConversationId === msg.conversationId){
       appendMessageBubble({
+        id: msg.id,
         text: msg.text,
         createdAt: msg.createdAt,
         mine: msg.senderUsername === me.username,
@@ -1004,6 +1045,51 @@ function postMediaHtml(media){
   }
   return `<div class="post-media" style="height:auto;border:1px solid var(--border);"><img src="/api/media/${media.id}" style="width:100%;max-height:420px;object-fit:contain;display:block;background:#000;"></div>`;
 }
+
+function renderPostCard(p){
+  return `
+    <div class="post" id="post-${p.id}">
+      <div class="avatar" style="${avatarStyle(p.author,42)}font-size:13px;cursor:pointer;" onclick="openProfile('${p.author.username}')">${avatarText(p.author)}</div>
+      <div class="post-body">
+        <div class="post-head">
+          <span class="name" style="cursor:pointer;" onclick="openProfile('${p.author.username}')">${esc(p.author.displayName)}</span>
+          ${verifiedBadge(p.author.verified)}
+          <span class="handle">@${p.author.username}</span>
+          <span class="dot">·</span>
+          <span class="time">${timeAgo(p.createdAt)}</span>
+          ${p.editedAt ? `<span class="edited-tag">· edited</span>` : ''}
+          ${p.isMine ? `
+          <div class="post-menu-wrap">
+            <button class="post-menu-btn" onclick="togglePostMenu('${p.id}')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+            </button>
+            <div class="post-menu-dropdown hidden" id="post-menu-${p.id}">
+              <button onclick="startEditPost('${p.id}')">Edit</button>
+              <button class="danger" onclick="deletePost('${p.id}')">Delete</button>
+            </div>
+          </div>` : ''}
+        </div>
+        <div id="post-display-${p.id}">
+          <div class="post-text" id="post-text-${p.id}">${esc(p.text).replace(/#(\w+)/g,'<span class="tag">#$1</span>')}</div>
+          ${postMediaHtml(p.media)}
+        </div>
+        <div class="post-edit-box hidden" id="post-edit-${p.id}"></div>
+        <div class="post-actions">
+          <button class="${p.likedByMe?'liked':''}" onclick="toggleLike('${p.id}', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 00-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 000-7.8z"/></svg><span>${p.likeCount}</span></button>
+          <button onclick="toggleComments('${p.id}')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg><span id="comment-count-${p.id}">${p.commentCount}</span></button>
+          <button onclick="sharePost('${p.id}', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg><span id="share-count-${p.id}">${p.shareCount||0}</span></button>
+        </div>
+        <div class="comments-panel hidden" id="comments-panel-${p.id}">
+          <div id="comments-list-${p.id}"></div>
+          <div class="comment-composer">
+            <input id="comment-input-${p.id}" placeholder="write a comment..." onkeydown="if(event.key==='Enter') submitComment('${p.id}')">
+            <button onclick="submitComment('${p.id}')">Reply</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
 async function loadFeed(){
   const data = await api('/posts');
   renderFeed(data.posts);
@@ -1014,28 +1100,138 @@ function renderFeed(posts){
     wrap.innerHTML = `<div class="post"><div class="post-body" style="color:var(--text-faint);">no posts yet — be the first to post something.</div></div>`;
     return;
   }
-  wrap.innerHTML = posts.map(p=>`
-    <div class="post">
-      <div class="avatar" style="${avatarStyle(p.author,42)}font-size:13px;cursor:pointer;" onclick="openProfile('${p.author.username}')">${avatarText(p.author)}</div>
-      <div class="post-body">
-        <div class="post-head">
-          <span class="name" style="cursor:pointer;" onclick="openProfile('${p.author.username}')">${esc(p.author.displayName)}</span>
-          ${verifiedBadge(p.author.verified)}
-          <span class="handle">@${p.author.username}</span>
-          <span class="dot">·</span>
-          <span class="time">${timeAgo(p.createdAt)}</span>
-        </div>
-        <div class="post-text">${esc(p.text).replace(/#(\w+)/g,'<span class="tag">#$1</span>')}</div>
-        ${postMediaHtml(p.media)}
-        <div class="post-actions">
-          <button class="${p.likedByMe?'liked':''}" onclick="toggleLike('${p.id}', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 00-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 000-7.8z"/></svg><span>${p.likeCount}</span></button>
-          <button><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg><span>0</span></button>
-          <button><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg><span>share</span></button>
+  wrap.innerHTML = posts.map(renderPostCard).join('');
+}
+let openPostMenuId = null;
+function togglePostMenu(postId){
+  if(openPostMenuId && openPostMenuId !== postId){
+    const prev = document.getElementById('post-menu-'+openPostMenuId);
+    if(prev) prev.classList.add('hidden');
+  }
+  const menu = document.getElementById('post-menu-'+postId);
+  const willOpen = menu.classList.contains('hidden');
+  menu.classList.toggle('hidden', !willOpen);
+  openPostMenuId = willOpen ? postId : null;
+}
+document.addEventListener('click', (e)=>{
+  if(openPostMenuId && !e.target.closest('.post-menu-wrap')){
+    const menu = document.getElementById('post-menu-'+openPostMenuId);
+    if(menu) menu.classList.add('hidden');
+    openPostMenuId = null;
+  }
+});
+
+function startEditPost(postId){
+  togglePostMenu(postId); // closes the dropdown
+  const displayEl = document.getElementById('post-display-'+postId);
+  const editBox = document.getElementById('post-edit-'+postId);
+  const currentText = document.getElementById('post-text-'+postId).textContent;
+  displayEl.classList.add('hidden');
+  editBox.classList.remove('hidden');
+  editBox.innerHTML = `
+    <textarea id="post-edit-textarea-${postId}">${esc(currentText)}</textarea>
+    <div class="post-edit-actions">
+      <button class="cancel" onclick="cancelEditPost('${postId}')">Cancel</button>
+      <button class="save" onclick="saveEditPost('${postId}')">Save</button>
+    </div>`;
+  document.getElementById('post-edit-textarea-'+postId).focus();
+}
+function cancelEditPost(postId){
+  document.getElementById('post-display-'+postId).classList.remove('hidden');
+  document.getElementById('post-edit-'+postId).classList.add('hidden');
+  document.getElementById('post-edit-'+postId).innerHTML = '';
+}
+async function saveEditPost(postId){
+  const textarea = document.getElementById('post-edit-textarea-'+postId);
+  const text = textarea.value.trim();
+  if(!text){ alert('post text is required'); return; }
+  try{
+    await api('/posts/'+postId, {method:'PATCH', body:{text}});
+    document.getElementById('post-text-'+postId).innerHTML = esc(text).replace(/#(\w+)/g,'<span class="tag">#$1</span>');
+    cancelEditPost(postId);
+    const headRow = document.querySelector('#post-'+postId+' .post-head');
+    if(headRow && !headRow.querySelector('.edited-tag')){
+      const menuWrap = headRow.querySelector('.post-menu-wrap');
+      const tag = document.createElement('span');
+      tag.className = 'edited-tag';
+      tag.textContent = '· edited';
+      if(menuWrap) headRow.insertBefore(tag, menuWrap); else headRow.appendChild(tag);
+    }
+  }catch(e){ alert(e.message); }
+}
+async function deletePost(postId){
+  togglePostMenu(postId);
+  if(!confirm('Delete this post? This can\'t be undone.')) return;
+  try{
+    await api('/posts/'+postId, {method:'DELETE'});
+    const el = document.getElementById('post-'+postId);
+    if(el) el.remove();
+  }catch(e){ alert(e.message); }
+}
+async function sharePost(postId, btn){
+  try{
+    const data = await api('/posts/'+postId+'/share', {method:'POST'});
+    btn.querySelector('span').textContent = data.shareCount;
+    const link = window.location.origin + '/?post=' + postId;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(link);
+    }
+    const original = btn.innerHTML;
+    btn.innerHTML = `<span style="color:var(--accent);">link copied!</span>`;
+    setTimeout(()=>{ btn.innerHTML = original; }, 1500);
+  }catch(e){ alert(e.message); }
+}
+
+let openCommentsPostId = new Set();
+async function toggleComments(postId){
+  const panel = document.getElementById('comments-panel-'+postId);
+  const willOpen = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden', !willOpen);
+  if(willOpen){
+    await loadComments(postId);
+  }
+}
+async function loadComments(postId){
+  const data = await api('/posts/'+postId+'/comments');
+  renderComments(postId, data.comments);
+}
+function renderComments(postId, comments){
+  const wrap = document.getElementById('comments-list-'+postId);
+  wrap.innerHTML = comments.length ? comments.map(c=>`
+    <div class="comment-row">
+      <div class="avatar" style="${avatarStyle(c.author,28)}font-size:10px;cursor:pointer;" onclick="openProfile('${c.author.username}')">${avatarText(c.author)}</div>
+      <div class="comment-bubble">
+        <div class="cn">${esc(c.author.displayName)} ${verifiedBadge(c.author.verified)}</div>
+        <div class="ct">${esc(c.text)}</div>
+        <div class="comment-meta">
+          <span>${timeAgo(c.createdAt)}</span>
+          ${c.isMine ? `<button class="danger" onclick="deleteComment('${postId}','${c.id}')">delete</button>` : ''}
         </div>
       </div>
-    </div>
-  `).join('');
+    </div>`).join('') : `<div style="color:var(--text-faint);font-size:12.5px;font-family:var(--font-mono);padding:6px 0;">no comments yet — say something 👋</div>`;
 }
+async function submitComment(postId){
+  const input = document.getElementById('comment-input-'+postId);
+  const text = input.value.trim();
+  if(!text) return;
+  try{
+    const data = await api('/posts/'+postId+'/comments', {method:'POST', body:{text}});
+    input.value = '';
+    await loadComments(postId);
+    const countEl = document.getElementById('comment-count-'+postId);
+    if(countEl) countEl.textContent = data.commentCount;
+  }catch(e){ alert(e.message); }
+}
+async function deleteComment(postId, commentId){
+  if(!confirm('Delete this comment?')) return;
+  try{
+    const data = await api('/posts/'+postId+'/comments/'+commentId, {method:'DELETE'});
+    await loadComments(postId);
+    const countEl = document.getElementById('comment-count-'+postId);
+    if(countEl) countEl.textContent = data.commentCount;
+  }catch(e){ alert(e.message); }
+}
+
 let composerPendingMedia = null; // { dataUrl, type: 'image'|'video' }
 
 async function handleComposerMediaFile(event){
@@ -1473,16 +1669,7 @@ async function openProfile(username){
   if(myToken !== profileRequestToken) return; // still guard after the second await
   const mine = postsData.posts.filter(p=>p.author.username===u.username);
   const wrap = document.getElementById('profile-posts');
-  wrap.innerHTML = mine.length ? mine.map(p=>`
-    <div class="post" style="padding-left:0;padding-right:0;">
-      <div class="avatar" style="${avatarStyle(u,38)}font-size:13px;">${avatarText(u)}</div>
-      <div class="post-body">
-        <div class="post-head"><span class="name">${esc(u.displayName)}</span> ${verifiedBadge(u.verified)} <span class="dot">·</span> <span class="time">${timeAgo(p.createdAt)}</span></div>
-        <div class="post-text">${esc(p.text).replace(/#(\w+)/g,'<span class="tag">#$1</span>')}</div>
-        ${postMediaHtml(p.media)}
-        <div class="post-actions"><button class="${p.likedByMe?'liked':''}" onclick="toggleLike('${p.id}', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 00-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 000-7.8z"/></svg><span>${p.likeCount}</span></button></div>
-      </div>
-    </div>`).join('') : `<div style="padding:20px 0;color:var(--text-faint);font-size:13.5px;">no posts yet.</div>`;
+  wrap.innerHTML = mine.length ? mine.map(renderPostCard).join('') : `<div style="padding:20px 0;color:var(--text-faint);font-size:13.5px;">no posts yet.</div>`;
 }
 function goViewOnlyProfile(){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view==='profile'));

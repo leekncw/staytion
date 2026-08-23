@@ -296,26 +296,31 @@ async function attachMediaToPost(post, dataUrl, mediaType, ownerId) {
   await db.saveMediaBytes(mediaId, decoded.buffer);
 }
 
+function serializePost(p, me) {
+  const author = db.data.users.find((u) => u.id === p.userId);
+  const likeCount = db.data.likes.filter((l) => l.postId === p.id).length;
+  const likedByMe = db.data.likes.some((l) => l.postId === p.id && l.userId === me.id);
+  const commentCount = db.data.comments.filter((c) => c.postId === p.id).length;
+  return {
+    id: p.id,
+    text: p.text,
+    createdAt: p.createdAt,
+    editedAt: p.editedAt || null,
+    media: p.mediaId ? { id: p.mediaId, type: p.mediaType } : null,
+    author: author
+      ? { username: author.username, displayName: author.displayName, verified: !!author.verified, avatarUrl: author.avatarUrl || null }
+      : { username: 'deleted', displayName: 'deleted user', verified: false, avatarUrl: null },
+    likeCount,
+    likedByMe,
+    commentCount,
+    shareCount: p.shareCount || 0,
+    isMine: !!author && author.id === me.id,
+  };
+}
+
 app.get('/api/posts', requireAuth, (req, res) => {
   const me = currentUser(req);
-  const posts = [...db.data.posts]
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .map((p) => {
-      const author = db.data.users.find((u) => u.id === p.userId);
-      const likeCount = db.data.likes.filter((l) => l.postId === p.id).length;
-      const likedByMe = db.data.likes.some((l) => l.postId === p.id && l.userId === me.id);
-      return {
-        id: p.id,
-        text: p.text,
-        createdAt: p.createdAt,
-        media: p.mediaId ? { id: p.mediaId, type: p.mediaType } : null,
-        author: author
-          ? { username: author.username, displayName: author.displayName, verified: !!author.verified, avatarUrl: author.avatarUrl || null }
-          : { username: 'deleted', displayName: 'deleted user', verified: false, avatarUrl: null },
-        likeCount,
-        likedByMe,
-      };
-    });
+  const posts = [...db.data.posts].sort((a, b) => b.createdAt - a.createdAt).map((p) => serializePost(p, me));
   res.json({ posts });
 });
 
@@ -343,17 +348,102 @@ app.post('/api/posts', requireAuth, async (req, res) => {
 
   db.data.posts.push(post);
   db.save();
+  res.json({ post: serializePost(post, me) });
+});
+
+app.patch('/api/posts/:id', requireAuth, (req, res) => {
+  const me = currentUser(req);
+  const post = db.data.posts.find((p) => p.id === req.params.id);
+  if (!post) return res.status(404).json({ error: 'post not found' });
+  if (post.userId !== me.id) return res.status(403).json({ error: 'you can only edit your own posts' });
+
+  const text = String((req.body || {}).text || '').trim();
+  if (!text && !post.mediaId) return res.status(400).json({ error: 'post text is required' });
+  post.text = text;
+  post.editedAt = Date.now();
+  db.save();
+  res.json({ post: serializePost(post, me) });
+});
+
+app.delete('/api/posts/:id', requireAuth, async (req, res) => {
+  const me = currentUser(req);
+  const post = db.data.posts.find((p) => p.id === req.params.id);
+  if (!post) return res.status(404).json({ error: 'post not found' });
+  if (post.userId !== me.id) return res.status(403).json({ error: 'you can only delete your own posts' });
+
+  db.data.posts = db.data.posts.filter((p) => p.id !== post.id);
+  db.data.likes = db.data.likes.filter((l) => l.postId !== post.id);
+  db.data.comments = db.data.comments.filter((c) => c.postId !== post.id);
+  if (post.mediaId) {
+    db.data.mediaIndex = db.data.mediaIndex.filter((m) => m.id !== post.mediaId);
+    await db.deleteMediaBytes(post.mediaId);
+  }
+  db.save();
+  res.json({ ok: true });
+});
+
+app.post('/api/posts/:id/share', requireAuth, (req, res) => {
+  const post = db.data.posts.find((p) => p.id === req.params.id);
+  if (!post) return res.status(404).json({ error: 'post not found' });
+  post.shareCount = (post.shareCount || 0) + 1;
+  db.save();
+  res.json({ shareCount: post.shareCount });
+});
+
+app.get('/api/posts/:id/comments', requireAuth, (req, res) => {
+  const post = db.data.posts.find((p) => p.id === req.params.id);
+  if (!post) return res.status(404).json({ error: 'post not found' });
+  const me = currentUser(req);
+  const comments = db.data.comments
+    .filter((c) => c.postId === post.id)
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .map((c) => {
+      const author = db.data.users.find((u) => u.id === c.userId);
+      return {
+        id: c.id,
+        text: c.text,
+        createdAt: c.createdAt,
+        isMine: !!author && author.id === me.id,
+        author: author
+          ? { username: author.username, displayName: author.displayName, verified: !!author.verified, avatarUrl: author.avatarUrl || null }
+          : { username: 'deleted', displayName: 'deleted user', verified: false, avatarUrl: null },
+      };
+    });
+  res.json({ comments });
+});
+
+app.post('/api/posts/:id/comments', requireAuth, (req, res) => {
+  const me = currentUser(req);
+  const post = db.data.posts.find((p) => p.id === req.params.id);
+  if (!post) return res.status(404).json({ error: 'post not found' });
+  const text = String((req.body || {}).text || '').trim();
+  if (!text) return res.status(400).json({ error: 'comment text is required' });
+
+  const comment = { id: crypto.randomUUID(), postId: post.id, userId: me.id, text, createdAt: Date.now() };
+  db.data.comments.push(comment);
+  addNotification(post.userId, 'comment', me.id, `<b>${me.displayName}</b> commented: "${text.slice(0, 60)}${text.length > 60 ? '…' : ''}"`);
+  db.save();
+
   res.json({
-    post: {
-      id: post.id,
-      text: post.text,
-      createdAt: post.createdAt,
-      media: post.mediaId ? { id: post.mediaId, type: post.mediaType } : null,
+    comment: {
+      id: comment.id,
+      text: comment.text,
+      createdAt: comment.createdAt,
+      isMine: true,
       author: { username: me.username, displayName: me.displayName, verified: !!me.verified, avatarUrl: me.avatarUrl || null },
-      likeCount: 0,
-      likedByMe: false,
     },
+    commentCount: db.data.comments.filter((c) => c.postId === post.id).length,
   });
+});
+
+app.delete('/api/posts/:postId/comments/:commentId', requireAuth, (req, res) => {
+  const me = currentUser(req);
+  const comment = db.data.comments.find((c) => c.id === req.params.commentId && c.postId === req.params.postId);
+  if (!comment) return res.status(404).json({ error: 'comment not found' });
+  if (comment.userId !== me.id) return res.status(403).json({ error: 'you can only delete your own comments' });
+  db.data.comments = db.data.comments.filter((c) => c.id !== comment.id);
+  db.save();
+  res.json({ ok: true, commentCount: db.data.comments.filter((c) => c.postId === req.params.postId).length });
 });
 
 // Serves the actual bytes for a post photo/video. Cached hard since a given

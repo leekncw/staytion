@@ -23,6 +23,7 @@ const DEFAULT_DATA = {
   users: [],
   posts: [],
   likes: [],
+  comments: [],
   follows: [],
   conversations: [],
   messages: [],
