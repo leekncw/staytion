@@ -14,7 +14,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.json({ limit: '6mb' }));
+app.use(express.json({ limit: '24mb' }));
 
 // needed so secure cookies work correctly behind Render/Railway/etc's HTTPS proxy
 if (IS_PRODUCTION) app.set('trust proxy', 1);
@@ -254,6 +254,48 @@ app.patch('/api/users/:username/role', requireAuth, (req, res) => {
 // posts / likes / trending
 // ---------------------------------------------------------------------------
 
+const MAX_POST_IMAGE_BYTES = 5 * 1024 * 1024;  // 5MB after decoding, for post photos
+const MAX_POST_VIDEO_BYTES = 15 * 1024 * 1024; // 15MB after decoding, for short post clips
+
+class HttpError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// Parses a data:<mime>;base64,<data> string into { contentType, buffer }.
+function decodeDataUrl(dataUrl) {
+  const match = /^data:([\w.+-]+\/[\w.+-]+);base64,([\s\S]+)$/.exec(dataUrl || '');
+  if (!match) return null;
+  try {
+    return { contentType: match[1], buffer: Buffer.from(match[2], 'base64') };
+  } catch (e) {
+    return null;
+  }
+}
+
+async function attachMediaToPost(post, dataUrl, mediaType, ownerId) {
+  const decoded = decodeDataUrl(dataUrl);
+  if (!decoded) throw new HttpError(400, 'that media file looks corrupted, try a different one');
+
+  const expectedPrefix = mediaType === 'video' ? 'video/' : 'image/';
+  if (!decoded.contentType.startsWith(expectedPrefix)) {
+    throw new HttpError(400, `expected a${mediaType === 'video' ? ' video' : 'n image'} file`);
+  }
+
+  const maxBytes = mediaType === 'video' ? MAX_POST_VIDEO_BYTES : MAX_POST_IMAGE_BYTES;
+  if (decoded.buffer.length > maxBytes) {
+    throw new HttpError(400, `that ${mediaType} is too large - try a smaller/shorter one`);
+  }
+
+  const mediaId = crypto.randomUUID();
+  db.data.mediaIndex.push({ id: mediaId, contentType: decoded.contentType, ownerId, createdAt: Date.now() });
+  post.mediaId = mediaId;
+  post.mediaType = mediaType;
+  await db.saveMediaBytes(mediaId, decoded.buffer);
+}
+
 app.get('/api/posts', requireAuth, (req, res) => {
   const me = currentUser(req);
   const posts = [...db.data.posts]
@@ -266,6 +308,7 @@ app.get('/api/posts', requireAuth, (req, res) => {
         id: p.id,
         text: p.text,
         createdAt: p.createdAt,
+        media: p.mediaId ? { id: p.mediaId, type: p.mediaType } : null,
         author: author
           ? { username: author.username, displayName: author.displayName, verified: !!author.verified, avatarUrl: author.avatarUrl || null }
           : { username: 'deleted', displayName: 'deleted user', verified: false, avatarUrl: null },
@@ -276,11 +319,28 @@ app.get('/api/posts', requireAuth, (req, res) => {
   res.json({ posts });
 });
 
-app.post('/api/posts', requireAuth, (req, res) => {
+app.post('/api/posts', requireAuth, async (req, res) => {
   const me = currentUser(req);
   const text = String((req.body || {}).text || '').trim();
-  if (!text) return res.status(400).json({ error: 'post text is required' });
+  const mediaDataUrl = (req.body || {}).mediaDataUrl;
+  const mediaType = (req.body || {}).mediaType; // 'image' | 'video'
+
+  if (!text && !mediaDataUrl) return res.status(400).json({ error: 'post text or media is required' });
+  if (mediaDataUrl && !['image', 'video'].includes(mediaType)) {
+    return res.status(400).json({ error: 'mediaType must be image or video' });
+  }
+
   const post = { id: crypto.randomUUID(), userId: me.id, text, createdAt: Date.now() };
+
+  if (mediaDataUrl) {
+    try {
+      await attachMediaToPost(post, mediaDataUrl, mediaType, me.id);
+    } catch (e) {
+      const status = e instanceof HttpError ? e.status : 500;
+      return res.status(status).json({ error: e.message || 'could not attach that media' });
+    }
+  }
+
   db.data.posts.push(post);
   db.save();
   res.json({
@@ -288,11 +348,24 @@ app.post('/api/posts', requireAuth, (req, res) => {
       id: post.id,
       text: post.text,
       createdAt: post.createdAt,
+      media: post.mediaId ? { id: post.mediaId, type: post.mediaType } : null,
       author: { username: me.username, displayName: me.displayName, verified: !!me.verified, avatarUrl: me.avatarUrl || null },
       likeCount: 0,
       likedByMe: false,
     },
   });
+});
+
+// Serves the actual bytes for a post photo/video. Cached hard since a given
+// media id's content never changes once uploaded.
+app.get('/api/media/:id', requireAuth, async (req, res) => {
+  const entry = db.data.mediaIndex.find((m) => m.id === req.params.id);
+  if (!entry) return res.status(404).end();
+  const buffer = await db.getMediaBytes(req.params.id);
+  if (!buffer) return res.status(404).end();
+  res.set('Content-Type', entry.contentType);
+  res.set('Cache-Control', 'private, max-age=31536000, immutable');
+  res.send(buffer);
 });
 
 app.post('/api/posts/:id/like', requireAuth, (req, res) => {

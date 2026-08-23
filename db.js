@@ -17,6 +17,7 @@ const path = require('path');
 
 const DATA_DIR = path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'db.json');
+const MEDIA_DIR = path.join(DATA_DIR, 'media');
 
 const DEFAULT_DATA = {
   users: [],
@@ -27,11 +28,13 @@ const DEFAULT_DATA = {
   messages: [],
   notifications: [],
   news: [],
+  mediaIndex: [], // small metadata records only: {id, contentType, ownerId, createdAt}. Actual bytes live separately (see below).
 };
 
 const data = { ...DEFAULT_DATA };
 let mode = 'file';
 let mongoCollection = null;
+let mongoMediaCollection = null;
 
 async function init() {
   const uri = process.env.MONGODB_URI;
@@ -43,6 +46,7 @@ async function init() {
     await client.connect();
     const dbName = process.env.MONGODB_DB || 'staytion';
     mongoCollection = client.db(dbName).collection('appdata');
+    mongoMediaCollection = client.db(dbName).collection('media');
 
     const doc = await mongoCollection.findOne({ _id: 'staytion-data' });
     if (doc) {
@@ -55,6 +59,7 @@ async function init() {
     console.log('STAYtion: connected to MongoDB - your data will persist there across restarts.');
   } else {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    if (!fs.existsSync(MEDIA_DIR)) fs.mkdirSync(MEDIA_DIR, { recursive: true });
     let loaded = {};
     if (fs.existsSync(DATA_FILE)) {
       try {
@@ -81,5 +86,49 @@ function save() {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
-module.exports = { data, init, save };
+// ---------------------------------------------------------------------------
+// Media storage (post images/videos, avatars, banners).
+//
+// Kept OUT of the main `data` blob on purpose: MongoDB caps a single document
+// at 16MB, and the main blob holds every user/post/message. If photos and
+// videos lived inside it too, a handful of uploads could blow past that
+// limit and corrupt the whole app's data. Instead each media file is its own
+// small record - a separate Mongo document, or a separate file on disk -
+// referenced from posts/profiles by a short id instead of embedding the
+// actual bytes everywhere.
+// ---------------------------------------------------------------------------
+
+async function saveMediaBytes(id, buffer) {
+  if (mode === 'mongo' && mongoMediaCollection) {
+    await mongoMediaCollection.replaceOne(
+      { _id: id },
+      { _id: id, bytes: buffer, createdAt: Date.now() },
+      { upsert: true }
+    );
+    return;
+  }
+  fs.writeFileSync(path.join(MEDIA_DIR, id), buffer);
+}
+
+async function getMediaBytes(id) {
+  if (mode === 'mongo' && mongoMediaCollection) {
+    const doc = await mongoMediaCollection.findOne({ _id: id });
+    if (!doc) return null;
+    return doc.bytes.buffer ? Buffer.from(doc.bytes.buffer) : Buffer.from(doc.bytes);
+  }
+  const filePath = path.join(MEDIA_DIR, id);
+  if (!fs.existsSync(filePath)) return null;
+  return fs.readFileSync(filePath);
+}
+
+async function deleteMediaBytes(id) {
+  if (mode === 'mongo' && mongoMediaCollection) {
+    await mongoMediaCollection.deleteOne({ _id: id }).catch(() => {});
+    return;
+  }
+  const filePath = path.join(MEDIA_DIR, id);
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+}
+
+module.exports = { data, init, save, saveMediaBytes, getMediaBytes, deleteMediaBytes };
 
