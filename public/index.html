@@ -397,6 +397,29 @@
   .send-btn{ background:var(--accent); color:#0a0a0b; padding:13px 18px; display:flex; align-items:center; justify-content:center; }
   .send-btn:hover{ filter:brightness(1.1); }
 
+  /* ============ USER LIST MODAL ============ */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:100;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-panel{
+    width:100%; max-width:400px; max-height:70vh; background:var(--bg-elev); border:1px solid var(--border);
+    display:flex; flex-direction:column;
+  }
+  .modal-head{
+    padding:16px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;
+    font-family:var(--font-display); font-weight:700; font-size:14.5px; flex-shrink:0;
+  }
+  .modal-close{ color:var(--text-faint); font-size:14px; padding:4px; }
+  .modal-close:hover{ color:var(--text); }
+  .modal-body{ overflow-y:auto; padding:6px 0; }
+  .modal-user-row{ display:flex; align-items:center; gap:11px; padding:10px 18px; }
+  .modal-user-row:hover{ background:var(--surface); }
+  .modal-user-row .mi{ flex:1; min-width:0; cursor:pointer; }
+  .modal-user-row .mn{ font-size:13.5px; font-weight:700; display:flex; align-items:center; gap:5px; }
+  .modal-user-row .mh{ font-size:11.5px; color:var(--text-faint); font-family:var(--font-mono); }
+  .modal-empty{ padding:24px 18px; color:var(--text-faint); font-size:13px; text-align:center; }
+
   /* ============ SETTINGS VIEW ============ */
   .settings-section{ padding:22px 24px; border-bottom:1px solid var(--border); }
   .settings-section h3{ font-family:var(--font-display); font-size:14px; text-transform:uppercase; letter-spacing:1px; color:var(--text-dim); margin-bottom:16px; }
@@ -428,7 +451,7 @@
   .pfp-lg:hover .avatar-edit-hint{ opacity:1; }
   .profile-head{ padding:0 24px; position:relative; }
   .pfp-lg{ width:104px; height:104px; border:4px solid var(--bg); margin-top:-52px; font-size:34px; }
-  .profile-actions{ display:flex; justify-content:flex-end; margin-top:14px; }
+  .profile-actions{ position:absolute; top:14px; right:24px; display:flex; gap:10px; }
   .btn-edit{ border:1px solid var(--border); font-family:var(--font-display); font-weight:700; font-size:12.5px; padding:9px 18px; letter-spacing:.3px; }
   .btn-edit:hover{ border-color:var(--accent); color:var(--accent); }
   .profile-name{ font-family:var(--font-display); font-weight:700; font-size:21px; margin-top:14px; }
@@ -933,6 +956,17 @@
     </div>
   </aside>
 
+  <!-- ============ FOLLOWERS / FOLLOWING MODAL ============ -->
+  <div class="modal-backdrop hidden" id="user-list-modal" onclick="if(event.target===this) closeUserListModal()">
+    <div class="modal-panel cut">
+      <div class="modal-head">
+        <span id="user-list-modal-title"></span>
+        <button class="modal-close" onclick="closeUserListModal()">✕</button>
+      </div>
+      <div class="modal-body" id="user-list-modal-body"></div>
+    </div>
+  </div>
+
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -1199,9 +1233,9 @@ function goView(name){
 function postMediaHtml(media){
   if(!media) return '';
   if(media.type === 'video'){
-    return `<div class="post-media" style="height:auto;border:1px solid var(--border);"><video src="/api/media/${media.id}" controls style="width:100%;max-height:420px;display:block;"></video></div>`;
+    return `<div class="post-media" style="height:auto;border:1px solid var(--border);"><video src="/api/media/${media.id}" controls style="max-width:100%;height:auto;display:block;"></video></div>`;
   }
-  return `<div class="post-media" style="height:auto;border:1px solid var(--border);"><img src="/api/media/${media.id}" style="width:100%;max-height:420px;object-fit:contain;display:block;background:#000;"></div>`;
+  return `<div class="post-media" style="height:auto;border:1px solid var(--border);"><img src="/api/media/${media.id}" style="max-width:100%;height:auto;display:block;"></div>`;
 }
 
 function renderPostCard(p, scope){
@@ -1364,10 +1398,10 @@ function renderComments(scope, postId, comments){
   const key = scope+'-'+postId;
   const wrap = document.getElementById('comments-list-'+key);
   wrap.innerHTML = comments.length ? comments.map(c=>`
-    <div class="comment-row">
+    <div class="comment-row" data-comment-id="${c.id}">
       <div class="avatar" style="${avatarStyle(c.author,28)}font-size:10px;cursor:pointer;" onclick="openProfile('${c.author.username}')">${avatarText(c.author)}</div>
       <div class="comment-bubble">
-        <div class="cn">${esc(c.author.displayName)} ${verifiedBadge(c.author.verified)}</div>
+        <div class="cn" style="cursor:pointer;" onclick="openProfile('${c.author.username}')">${esc(c.author.displayName)} ${verifiedBadge(c.author.verified)}</div>
         <div class="ct">${esc(c.text)}</div>
         <div class="comment-meta">
           <span>${timeAgo(c.createdAt)}</span>
@@ -1573,9 +1607,9 @@ function renderConvList(conversations){
   const wrap = document.getElementById('conv-items');
   wrap.innerHTML = conversations.map(c=>`
     <div class="conv-item ${c.id===activeConversationId?'active':''}" onclick='openConv(${JSON.stringify(c.id)}, ${JSON.stringify(c.other)}, {userInitiated:true})'>
-      <div class="avatar" style="${avatarStyle(c.other,40)}font-size:13px;">${avatarText(c.other)}</div>
+      <div class="avatar" style="${avatarStyle(c.other,40)}font-size:13px;cursor:pointer;" onclick="event.stopPropagation(); openProfile('${c.other.username}')">${avatarText(c.other)}</div>
       <div class="ci">
-        <div class="cn">${esc(c.other.displayName)} ${verifiedBadge(c.other.verified)}</div>
+        <div class="cn" style="cursor:pointer;" onclick="event.stopPropagation(); openProfile('${c.other.username}')">${esc(c.other.displayName)} ${verifiedBadge(c.other.verified)}</div>
         <div class="cm">${c.lastMessage ? (c.lastMessage.mine?'you: ':'') + esc(c.lastMessage.text) : 'say hi 👋'}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
@@ -1594,9 +1628,12 @@ async function openConv(id, other, opts){
   if(opts.userInitiated){
     document.querySelector('.msg-shell')?.classList.add('show-chat');
   }
-  document.getElementById('chat-avatar').setAttribute('style', avatarStyle(other,38)+'font-size:13px;');
+  document.getElementById('chat-avatar').setAttribute('style', avatarStyle(other,38)+'font-size:13px;cursor:pointer;');
   document.getElementById('chat-avatar').textContent = avatarText(other);
+  document.getElementById('chat-avatar').onclick = ()=>openProfile(other.username);
   document.getElementById('chat-name').innerHTML = esc(other.displayName) + ' ' + verifiedBadge(other.verified);
+  document.getElementById('chat-name').style.cursor = 'pointer';
+  document.getElementById('chat-name').onclick = ()=>openProfile(other.username);
   document.getElementById('chat-sub').textContent = '@'+other.username;
 
   const data = await api('/conversations/'+id+'/messages');
@@ -1610,7 +1647,7 @@ async function openConv(id, other, opts){
 function bubbleHtml(m){
   const who = m.mine ? me : activeConversationOther;
   return `<div class="bubble-row ${m.mine?'me':''}">
-      <div class="avatar" style="${avatarStyle(who,28)}font-size:10px;">${avatarText(who)}</div>
+      <div class="avatar" style="${avatarStyle(who,28)}font-size:10px;cursor:pointer;" onclick="openProfile('${who.username}')">${avatarText(who)}</div>
       <div>
         <div class="bubble cut-sm">${esc(m.text)}</div>
         <div class="bubble-meta">${new Date(m.createdAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</div>
@@ -1670,7 +1707,7 @@ async function loadNews(){
     return;
   }
   wrap.innerHTML = data.news.map(n=>`
-    <div class="news-post">
+    <div class="news-post" id="post-news-${n.id}">
       <div class="news-icon">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11a9 9 0 019 9"/><path d="M4 4a16 16 0 0116 16"/><circle cx="5" cy="19" r="1"/></svg>
       </div>
@@ -1682,6 +1719,15 @@ async function loadNews(){
           <span class="handle">@staytion</span>
           <span class="dot">·</span>
           <span class="time">${timeAgo(n.createdAt)}</span>
+          ${(me.role==='owner'||me.role==='moderator') ? `
+          <div class="post-menu-wrap">
+            <button class="post-menu-btn" onclick="togglePostMenu('news','${n.id}')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+            </button>
+            <div class="post-menu-dropdown hidden" id="post-menu-news-${n.id}">
+              <button class="danger" onclick="deleteNewsPost('${n.id}')">Delete</button>
+            </div>
+          </div>` : ''}
         </div>
         <div class="post-text" style="font-weight:600;margin-top:8px;">${esc(n.title)}</div>
         ${n.body ? `<div class="post-text" style="color:var(--text-dim);">${esc(n.body)}</div>` : ''}
@@ -1702,6 +1748,16 @@ async function postNews(){
   }catch(e){ alert(e.message); }
 }
 
+async function deleteNewsPost(id){
+  togglePostMenu('news', id);
+  if(!confirm('Delete this news post?')) return;
+  try{
+    await api('/news/'+id, {method:'DELETE'});
+    const el = document.getElementById('post-news-'+id);
+    if(el) el.remove();
+  }catch(e){ alert(e.message); }
+}
+
 /* =========================================================================
    NOTIFICATIONS
    ========================================================================= */
@@ -1711,6 +1767,32 @@ const notifIcons = {
   verify: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>',
   comment: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',
 };
+async function viewPostById(postId, commentId){
+  goView('feed');
+  await loadFeed();
+  setTimeout(()=>{
+    const el = document.getElementById('post-feed-'+postId);
+    if(!el) return; // post may have been deleted since the notification fired
+    el.scrollIntoView({behavior:'smooth', block:'center'});
+    el.style.outline = '2px solid var(--accent)';
+    el.style.outlineOffset = '-1px';
+    setTimeout(()=>{ el.style.outline = ''; }, 1600);
+
+    if(commentId){
+      toggleComments('feed', postId).then(()=>{
+        setTimeout(()=>{
+          const commentEl = document.querySelector(`#comments-list-feed-${postId} [data-comment-id="${commentId}"]`);
+          if(commentEl){
+            commentEl.scrollIntoView({behavior:'smooth', block:'center'});
+            commentEl.style.outline = '2px solid var(--accent)';
+            setTimeout(()=>{ commentEl.style.outline = ''; }, 1600);
+          }
+        }, 250);
+      });
+    }
+  }, 150);
+}
+
 async function loadNotifications(silent){
   const data = await api('/notifications');
   const unreadCount = data.notifications.filter(n=>!n.read).length;
@@ -1732,7 +1814,13 @@ function renderNotifications(list){
   document.getElementById('notif-list').innerHTML = html;
 }
 function rowNotif(n){
-  return `<div class="notif-row ${n.read?'':'unread'}">
+  let action = '';
+  if(n.type === 'follow' && n.actorUsername) action = `openProfile('${n.actorUsername}')`;
+  else if(n.type === 'like' && n.postId) action = `viewPostById('${n.postId}')`;
+  else if(n.type === 'comment' && n.postId) action = `viewPostById('${n.postId}', ${n.commentId ? `'${n.commentId}'` : 'null'})`;
+  else if(n.type === 'verify') action = `openProfile('${me.username}')`;
+
+  return `<div class="notif-row ${n.read?'':'unread'}" ${action ? `style="cursor:pointer;" onclick="${action}"` : ''}>
     <div class="notif-icon ${n.type}">${notifIcons[n.type]||notifIcons.comment}</div>
     <div>
       <div class="notif-text">${n.text}</div>
@@ -1827,8 +1915,8 @@ async function openProfile(username){
   document.getElementById('profile-bio-line').textContent = u.bio || '';
   document.getElementById('profile-stats-line').innerHTML = `
     <div><b>${u.posts}</b><span>posts</span></div>
-    <div><b>${u.followers}</b><span>followers</span></div>
-    <div><b>${u.following}</b><span>following</span></div>`;
+    <div style="cursor:pointer;" onclick="showUserList('${u.username}','followers')"><b>${u.followers}</b><span>followers</span></div>
+    <div style="cursor:pointer;" onclick="showUserList('${u.username}','following')"><b>${u.following}</b><span>following</span></div>`;
 
   const actions = document.getElementById('profile-actions');
   if(u.isMe){
@@ -1892,6 +1980,43 @@ function viewPostFromGrid(postId){
     const el = document.getElementById('post-profile-'+postId);
     if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
   }, 60);
+}
+
+async function showUserList(username, kind){
+  const modal = document.getElementById('user-list-modal');
+  const title = document.getElementById('user-list-modal-title');
+  const body = document.getElementById('user-list-modal-body');
+  title.textContent = kind === 'followers' ? 'Followers' : 'Following';
+  body.innerHTML = `<div class="modal-empty">loading...</div>`;
+  modal.classList.remove('hidden');
+
+  try{
+    const data = await api('/users/'+username+'/'+kind);
+    if(!data.users.length){
+      body.innerHTML = `<div class="modal-empty">${kind === 'followers' ? 'no followers yet.' : 'not following anyone yet.'}</div>`;
+      return;
+    }
+    body.innerHTML = data.users.map(u=>`
+      <div class="modal-user-row">
+        <div class="avatar" style="${avatarStyle(u,36)}font-size:12px;cursor:pointer;" onclick="closeUserListModal(); openProfile('${u.username}')">${avatarText(u)}</div>
+        <div class="mi" onclick="closeUserListModal(); openProfile('${u.username}')">
+          <div class="mn">${esc(u.displayName)} ${verifiedBadge(u.verified)}</div>
+          <div class="mh">@${u.username}</div>
+        </div>
+        ${u.isMe ? '' : `<button class="btn-follow" onclick="toggleFollowFromModal('${u.username}', this)">${u.isFollowing?'Following':'Follow'}</button>`}
+      </div>`).join('');
+  }catch(e){
+    body.innerHTML = `<div class="modal-empty">${e.message}</div>`;
+  }
+}
+function closeUserListModal(){
+  document.getElementById('user-list-modal').classList.add('hidden');
+}
+async function toggleFollowFromModal(username, btn){
+  try{
+    const data = await api('/users/'+username+'/follow', {method:'POST'});
+    btn.textContent = data.isFollowing ? 'Following' : 'Follow';
+  }catch(e){ alert(e.message); }
 }
 
 function goViewOnlyProfile(){

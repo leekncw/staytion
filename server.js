@@ -72,7 +72,7 @@ function publicUser(u) {
   };
 }
 
-function addNotification(userId, type, actorId, text) {
+function addNotification(userId, type, actorId, text, meta) {
   if (userId === actorId) return; // don't notify yourself
   db.data.notifications.push({
     id: crypto.randomUUID(),
@@ -80,6 +80,8 @@ function addNotification(userId, type, actorId, text) {
     type,
     actorId,
     text,
+    postId: (meta && meta.postId) || null,
+    commentId: (meta && meta.commentId) || null,
     read: false,
     createdAt: Date.now(),
   });
@@ -192,6 +194,37 @@ app.get('/api/users/:username/liked-posts', requireAuth, (req, res) => {
     .filter(Boolean)
     .map((p) => serializePost(p, me));
   res.json({ posts });
+});
+
+function serializeUserForList(u, me) {
+  const isFollowing = db.data.follows.some((f) => f.followerId === me.id && f.followeeId === u.id);
+  return { ...publicUser(u), isFollowing, isMe: u.id === me.id };
+}
+
+app.get('/api/users/:username/followers', requireAuth, (req, res) => {
+  const target = findUserByUsername(req.params.username);
+  if (!target) return res.status(404).json({ error: 'user not found' });
+  const me = currentUser(req);
+  const followers = db.data.follows
+    .filter((f) => f.followeeId === target.id)
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map((f) => db.data.users.find((u) => u.id === f.followerId))
+    .filter(Boolean)
+    .map((u) => serializeUserForList(u, me));
+  res.json({ users: followers });
+});
+
+app.get('/api/users/:username/following', requireAuth, (req, res) => {
+  const target = findUserByUsername(req.params.username);
+  if (!target) return res.status(404).json({ error: 'user not found' });
+  const me = currentUser(req);
+  const following = db.data.follows
+    .filter((f) => f.followerId === target.id)
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map((f) => db.data.users.find((u) => u.id === f.followeeId))
+    .filter(Boolean)
+    .map((u) => serializeUserForList(u, me));
+  res.json({ users: following });
 });
 
 const MAX_IMAGE_DATA_URL_LENGTH = 3.5 * 1024 * 1024; // ~3.5MB of base64 text, plenty for a compressed jpeg
@@ -472,7 +505,7 @@ app.post('/api/posts/:id/comments', requireAuth, (req, res) => {
 
   const comment = { id: crypto.randomUUID(), postId: post.id, userId: me.id, text, createdAt: Date.now() };
   db.data.comments.push(comment);
-  addNotification(post.userId, 'comment', me.id, `<b>${me.displayName}</b> commented: "${text.slice(0, 60)}${text.length > 60 ? '…' : ''}"`);
+  addNotification(post.userId, 'comment', me.id, `<b>${me.displayName}</b> commented: "${text.slice(0, 60)}${text.length > 60 ? '…' : ''}"`, { postId: post.id, commentId: comment.id });
   db.save();
 
   res.json({
@@ -518,7 +551,7 @@ app.post('/api/posts/:id/like', requireAuth, (req, res) => {
     db.data.likes = db.data.likes.filter((l) => l !== existing);
   } else {
     db.data.likes.push({ postId: post.id, userId: me.id, createdAt: Date.now() });
-    addNotification(post.userId, 'like', me.id, `<b>${me.displayName}</b> liked your post`);
+    addNotification(post.userId, 'like', me.id, `<b>${me.displayName}</b> liked your post`, { postId: post.id });
   }
   db.save();
   const likeCount = db.data.likes.filter((l) => l.postId === post.id).length;
@@ -567,6 +600,14 @@ app.post('/api/news', requireAuth, requireMod, (req, res) => {
   res.json({ item });
 });
 
+app.delete('/api/news/:id', requireAuth, requireMod, (req, res) => {
+  const item = db.data.news.find((n) => n.id === req.params.id);
+  if (!item) return res.status(404).json({ error: 'news item not found' });
+  db.data.news = db.data.news.filter((n) => n.id !== item.id);
+  db.save();
+  res.json({ ok: true });
+});
+
 // ---------------------------------------------------------------------------
 // notifications
 // ---------------------------------------------------------------------------
@@ -575,7 +616,11 @@ app.get('/api/notifications', requireAuth, (req, res) => {
   const me = currentUser(req);
   const notifs = db.data.notifications
     .filter((n) => n.userId === me.id)
-    .sort((a, b) => b.createdAt - a.createdAt);
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map((n) => {
+      const actor = db.data.users.find((u) => u.id === n.actorId);
+      return { ...n, actorUsername: actor ? actor.username : null };
+    });
   res.json({ notifications: notifs });
 });
 
