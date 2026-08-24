@@ -1184,6 +1184,7 @@ function goView(name){
   });
   document.getElementById('side-rail').style.display = (name==='feed') ? 'flex' : 'none';
 
+  if(name==='feed') loadFeed();
   if(name==='search') runSearch();
   if(name==='messages') loadConversations();
   if(name==='news') loadNews();
@@ -1203,9 +1204,11 @@ function postMediaHtml(media){
   return `<div class="post-media" style="height:auto;border:1px solid var(--border);"><img src="/api/media/${media.id}" style="width:100%;max-height:420px;object-fit:contain;display:block;background:#000;"></div>`;
 }
 
-function renderPostCard(p){
+function renderPostCard(p, scope){
+  scope = scope || 'feed';
+  const key = scope+'-'+p.id;
   return `
-    <div class="post" id="post-${p.id}">
+    <div class="post" id="post-${key}">
       <div class="avatar" style="${avatarStyle(p.author,42)}font-size:13px;cursor:pointer;" onclick="openProfile('${p.author.username}')">${avatarText(p.author)}</div>
       <div class="post-body">
         <div class="post-head">
@@ -1217,30 +1220,30 @@ function renderPostCard(p){
           ${p.editedAt ? `<span class="edited-tag">· edited</span>` : ''}
           ${p.isMine ? `
           <div class="post-menu-wrap">
-            <button class="post-menu-btn" onclick="togglePostMenu('${p.id}')">
+            <button class="post-menu-btn" onclick="togglePostMenu('${scope}','${p.id}')">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
             </button>
-            <div class="post-menu-dropdown hidden" id="post-menu-${p.id}">
-              <button onclick="startEditPost('${p.id}')">Edit</button>
-              <button class="danger" onclick="deletePost('${p.id}')">Delete</button>
+            <div class="post-menu-dropdown hidden" id="post-menu-${key}">
+              <button onclick="startEditPost('${scope}','${p.id}')">Edit</button>
+              <button class="danger" onclick="deletePost('${scope}','${p.id}')">Delete</button>
             </div>
           </div>` : ''}
         </div>
-        <div id="post-display-${p.id}">
-          <div class="post-text" id="post-text-${p.id}">${esc(p.text).replace(/#(\w+)/g,'<span class="tag">#$1</span>')}</div>
+        <div id="post-display-${key}">
+          <div class="post-text" id="post-text-${key}">${esc(p.text).replace(/#(\w+)/g,'<span class="tag">#$1</span>')}</div>
           ${postMediaHtml(p.media)}
         </div>
-        <div class="post-edit-box hidden" id="post-edit-${p.id}"></div>
+        <div class="post-edit-box hidden" id="post-edit-${key}"></div>
         <div class="post-actions">
           <button class="${p.likedByMe?'liked':''}" onclick="toggleLike('${p.id}', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 00-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 000-7.8z"/></svg><span>${p.likeCount}</span></button>
-          <button onclick="toggleComments('${p.id}')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg><span id="comment-count-${p.id}">${p.commentCount}</span></button>
-          <button onclick="sharePost('${p.id}', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg><span id="share-count-${p.id}">${p.shareCount||0}</span></button>
+          <button onclick="toggleComments('${scope}','${p.id}')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg><span id="comment-count-${key}">${p.commentCount}</span></button>
+          <button onclick="sharePost('${p.id}', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg><span id="share-count-${key}">${p.shareCount||0}</span></button>
         </div>
-        <div class="comments-panel hidden" id="comments-panel-${p.id}">
-          <div id="comments-list-${p.id}"></div>
+        <div class="comments-panel hidden" id="comments-panel-${key}">
+          <div id="comments-list-${key}"></div>
           <div class="comment-composer">
-            <input id="comment-input-${p.id}" placeholder="write a comment..." onkeydown="if(event.key==='Enter') submitComment('${p.id}')">
-            <button onclick="submitComment('${p.id}')">Reply</button>
+            <input id="comment-input-${key}" placeholder="write a comment..." onkeydown="if(event.key==='Enter') submitComment('${scope}','${p.id}')">
+            <button onclick="submitComment('${scope}','${p.id}')">Reply</button>
           </div>
         </div>
       </div>
@@ -1257,56 +1260,60 @@ function renderFeed(posts){
     wrap.innerHTML = `<div class="post"><div class="post-body" style="color:var(--text-faint);">no posts yet — be the first to post something.</div></div>`;
     return;
   }
-  wrap.innerHTML = posts.map(renderPostCard).join('');
+  wrap.innerHTML = posts.map(p=>renderPostCard(p,'feed')).join('');
 }
-let openPostMenuId = null;
-function togglePostMenu(postId){
-  if(openPostMenuId && openPostMenuId !== postId){
-    const prev = document.getElementById('post-menu-'+openPostMenuId);
+let openPostMenuKey = null;
+function togglePostMenu(scope, postId){
+  const key = scope+'-'+postId;
+  if(openPostMenuKey && openPostMenuKey !== key){
+    const prev = document.getElementById('post-menu-'+openPostMenuKey);
     if(prev) prev.classList.add('hidden');
   }
-  const menu = document.getElementById('post-menu-'+postId);
+  const menu = document.getElementById('post-menu-'+key);
   const willOpen = menu.classList.contains('hidden');
   menu.classList.toggle('hidden', !willOpen);
-  openPostMenuId = willOpen ? postId : null;
+  openPostMenuKey = willOpen ? key : null;
 }
 document.addEventListener('click', (e)=>{
-  if(openPostMenuId && !e.target.closest('.post-menu-wrap')){
-    const menu = document.getElementById('post-menu-'+openPostMenuId);
+  if(openPostMenuKey && !e.target.closest('.post-menu-wrap')){
+    const menu = document.getElementById('post-menu-'+openPostMenuKey);
     if(menu) menu.classList.add('hidden');
-    openPostMenuId = null;
+    openPostMenuKey = null;
   }
 });
 
-function startEditPost(postId){
-  togglePostMenu(postId); // closes the dropdown
-  const displayEl = document.getElementById('post-display-'+postId);
-  const editBox = document.getElementById('post-edit-'+postId);
-  const currentText = document.getElementById('post-text-'+postId).textContent;
+function startEditPost(scope, postId){
+  togglePostMenu(scope, postId); // closes the dropdown
+  const key = scope+'-'+postId;
+  const displayEl = document.getElementById('post-display-'+key);
+  const editBox = document.getElementById('post-edit-'+key);
+  const currentText = document.getElementById('post-text-'+key).textContent;
   displayEl.classList.add('hidden');
   editBox.classList.remove('hidden');
   editBox.innerHTML = `
-    <textarea id="post-edit-textarea-${postId}">${esc(currentText)}</textarea>
+    <textarea id="post-edit-textarea-${key}">${esc(currentText)}</textarea>
     <div class="post-edit-actions">
-      <button class="cancel" onclick="cancelEditPost('${postId}')">Cancel</button>
-      <button class="save" onclick="saveEditPost('${postId}')">Save</button>
+      <button class="cancel" onclick="cancelEditPost('${scope}','${postId}')">Cancel</button>
+      <button class="save" onclick="saveEditPost('${scope}','${postId}')">Save</button>
     </div>`;
-  document.getElementById('post-edit-textarea-'+postId).focus();
+  document.getElementById('post-edit-textarea-'+key).focus();
 }
-function cancelEditPost(postId){
-  document.getElementById('post-display-'+postId).classList.remove('hidden');
-  document.getElementById('post-edit-'+postId).classList.add('hidden');
-  document.getElementById('post-edit-'+postId).innerHTML = '';
+function cancelEditPost(scope, postId){
+  const key = scope+'-'+postId;
+  document.getElementById('post-display-'+key).classList.remove('hidden');
+  document.getElementById('post-edit-'+key).classList.add('hidden');
+  document.getElementById('post-edit-'+key).innerHTML = '';
 }
-async function saveEditPost(postId){
-  const textarea = document.getElementById('post-edit-textarea-'+postId);
+async function saveEditPost(scope, postId){
+  const key = scope+'-'+postId;
+  const textarea = document.getElementById('post-edit-textarea-'+key);
   const text = textarea.value.trim();
   if(!text){ alert('post text is required'); return; }
   try{
     await api('/posts/'+postId, {method:'PATCH', body:{text}});
-    document.getElementById('post-text-'+postId).innerHTML = esc(text).replace(/#(\w+)/g,'<span class="tag">#$1</span>');
-    cancelEditPost(postId);
-    const headRow = document.querySelector('#post-'+postId+' .post-head');
+    document.getElementById('post-text-'+key).innerHTML = esc(text).replace(/#(\w+)/g,'<span class="tag">#$1</span>');
+    cancelEditPost(scope, postId);
+    const headRow = document.querySelector('#post-'+key+' .post-head');
     if(headRow && !headRow.querySelector('.edited-tag')){
       const menuWrap = headRow.querySelector('.post-menu-wrap');
       const tag = document.createElement('span');
@@ -1316,13 +1323,14 @@ async function saveEditPost(postId){
     }
   }catch(e){ alert(e.message); }
 }
-async function deletePost(postId){
-  togglePostMenu(postId);
+async function deletePost(scope, postId){
+  togglePostMenu(scope, postId);
   if(!confirm('Delete this post? This can\'t be undone.')) return;
   try{
     await api('/posts/'+postId, {method:'DELETE'});
-    const el = document.getElementById('post-'+postId);
-    if(el) el.remove();
+    // remove every copy of this post from the page (it may be rendered in more
+    // than one view at once, e.g. both the feed and the author's own profile)
+    document.querySelectorAll(`[id="post-feed-${postId}"], [id="post-profile-${postId}"]`).forEach(el=>el.remove());
   }catch(e){ alert(e.message); }
 }
 async function sharePost(postId, btn){
@@ -1339,21 +1347,22 @@ async function sharePost(postId, btn){
   }catch(e){ alert(e.message); }
 }
 
-let openCommentsPostId = new Set();
-async function toggleComments(postId){
-  const panel = document.getElementById('comments-panel-'+postId);
+async function toggleComments(scope, postId){
+  const key = scope+'-'+postId;
+  const panel = document.getElementById('comments-panel-'+key);
   const willOpen = panel.classList.contains('hidden');
   panel.classList.toggle('hidden', !willOpen);
   if(willOpen){
-    await loadComments(postId);
+    await loadComments(scope, postId);
   }
 }
-async function loadComments(postId){
+async function loadComments(scope, postId){
   const data = await api('/posts/'+postId+'/comments');
-  renderComments(postId, data.comments);
+  renderComments(scope, postId, data.comments);
 }
-function renderComments(postId, comments){
-  const wrap = document.getElementById('comments-list-'+postId);
+function renderComments(scope, postId, comments){
+  const key = scope+'-'+postId;
+  const wrap = document.getElementById('comments-list-'+key);
   wrap.innerHTML = comments.length ? comments.map(c=>`
     <div class="comment-row">
       <div class="avatar" style="${avatarStyle(c.author,28)}font-size:10px;cursor:pointer;" onclick="openProfile('${c.author.username}')">${avatarText(c.author)}</div>
@@ -1362,30 +1371,30 @@ function renderComments(postId, comments){
         <div class="ct">${esc(c.text)}</div>
         <div class="comment-meta">
           <span>${timeAgo(c.createdAt)}</span>
-          ${c.isMine ? `<button class="danger" onclick="deleteComment('${postId}','${c.id}')">delete</button>` : ''}
+          ${c.isMine ? `<button class="danger" onclick="deleteComment('${scope}','${postId}','${c.id}')">delete</button>` : ''}
         </div>
       </div>
     </div>`).join('') : `<div style="color:var(--text-faint);font-size:12.5px;font-family:var(--font-mono);padding:6px 0;">no comments yet — say something 👋</div>`;
 }
-async function submitComment(postId){
-  const input = document.getElementById('comment-input-'+postId);
+async function submitComment(scope, postId){
+  const key = scope+'-'+postId;
+  const input = document.getElementById('comment-input-'+key);
   const text = input.value.trim();
   if(!text) return;
   try{
     const data = await api('/posts/'+postId+'/comments', {method:'POST', body:{text}});
     input.value = '';
-    await loadComments(postId);
-    const countEl = document.getElementById('comment-count-'+postId);
-    if(countEl) countEl.textContent = data.commentCount;
+    await loadComments(scope, postId);
+    // keep every rendered copy of this post's comment count in sync
+    document.querySelectorAll(`[id="comment-count-feed-${postId}"], [id="comment-count-profile-${postId}"]`).forEach(el=>{ el.textContent = data.commentCount; });
   }catch(e){ alert(e.message); }
 }
-async function deleteComment(postId, commentId){
+async function deleteComment(scope, postId, commentId){
   if(!confirm('Delete this comment?')) return;
   try{
     const data = await api('/posts/'+postId+'/comments/'+commentId, {method:'DELETE'});
-    await loadComments(postId);
-    const countEl = document.getElementById('comment-count-'+postId);
-    if(countEl) countEl.textContent = data.commentCount;
+    await loadComments(scope, postId);
+    document.querySelectorAll(`[id="comment-count-feed-${postId}"], [id="comment-count-profile-${postId}"]`).forEach(el=>{ el.textContent = data.commentCount; });
   }catch(e){ alert(e.message); }
 }
 
@@ -1848,7 +1857,7 @@ async function renderProfileTabContent(){
   const emptyMsg = (text)=>`<div style="padding:20px 0;color:var(--text-faint);font-size:13.5px;">${text}</div>`;
 
   if(currentProfileTab === 'posts'){
-    wrap.innerHTML = profileAllPostsCache.length ? profileAllPostsCache.map(renderPostCard).join('') : emptyMsg('no posts yet.');
+    wrap.innerHTML = profileAllPostsCache.length ? profileAllPostsCache.map(p=>renderPostCard(p,'profile')).join('') : emptyMsg('no posts yet.');
     return;
   }
 
@@ -1865,7 +1874,7 @@ async function renderProfileTabContent(){
     const tabToken = profileRequestToken;
     const data = await api('/users/'+viewingUsername+'/liked-posts');
     if(tabToken !== profileRequestToken || currentProfileTab !== 'likes') return; // profile or tab changed while loading
-    wrap.innerHTML = data.posts.length ? data.posts.map(renderPostCard).join('') : emptyMsg('hasn\'t liked anything yet.');
+    wrap.innerHTML = data.posts.length ? data.posts.map(p=>renderPostCard(p,'profile')).join('') : emptyMsg('hasn\'t liked anything yet.');
   }
 }
 function renderMediaGridCell(p){
@@ -1880,7 +1889,7 @@ function renderMediaGridCell(p){
 function viewPostFromGrid(postId){
   setProfileTab('posts');
   setTimeout(()=>{
-    const el = document.getElementById('post-'+postId);
+    const el = document.getElementById('post-profile-'+postId);
     if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
   }, 60);
 }
