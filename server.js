@@ -44,6 +44,10 @@ function currentUser(req) {
 function requireAuth(req, res, next) {
   const u = currentUser(req);
   if (!u) return res.status(401).json({ error: 'not logged in' });
+  if (u.banned) {
+    req.session.destroy(() => {});
+    return res.status(403).json({ error: 'this account has been banned', code: 'banned' });
+  }
   next();
 }
 
@@ -63,6 +67,7 @@ function publicUser(u) {
     bio: u.bio || '',
     role: u.role,
     verified: !!u.verified,
+    banned: !!u.banned,
     createdAt: u.createdAt,
     avatarUrl: u.avatarUrl || null,
     bannerUrl: u.bannerUrl || null,
@@ -134,6 +139,7 @@ app.post('/api/signup', (req, res) => {
     passwordHash: bcrypt.hashSync(String(password), 10),
     role: isFirstUser ? 'owner' : 'user', // first account to ever sign up runs the platform
     verified: isFirstUser,
+    banned: false,
     bio: '',
     createdAt: Date.now(),
   };
@@ -149,6 +155,9 @@ app.post('/api/login', (req, res) => {
   if (!u || !bcrypt.compareSync(String(password || ''), u.passwordHash)) {
     return res.status(401).json({ error: 'incorrect username or password' });
   }
+  if (u.banned) {
+    return res.status(403).json({ error: 'this account has been banned', code: 'banned' });
+  }
   req.session.userId = u.id;
   res.json({ user: publicUser(u) });
 });
@@ -160,6 +169,10 @@ app.post('/api/logout', (req, res) => {
 app.get('/api/me', (req, res) => {
   const u = currentUser(req);
   if (!u) return res.status(401).json({ error: 'not logged in' });
+  if (u.banned) {
+    req.session.destroy(() => {});
+    return res.status(403).json({ error: 'this account has been banned', code: 'banned' });
+  }
   res.json({ user: publicUser(u) });
 });
 
@@ -363,6 +376,20 @@ app.patch('/api/users/:username/role', requireAuth, (req, res) => {
   res.json({ user: publicUser(target) });
 });
 
+app.patch('/api/users/:username/ban', requireAuth, requireMod, (req, res) => {
+  const me = currentUser(req);
+  const target = findUserByUsername(req.params.username);
+  if (!target) return res.status(404).json({ error: 'user not found' });
+  if (target.id === me.id) return res.status(400).json({ error: "you can't ban yourself" });
+  if (target.role !== 'user') {
+    return res.status(403).json({ error: "moderators can only ban regular accounts, not other moderators or the owner" });
+  }
+  const { banned } = req.body || {};
+  target.banned = !!banned;
+  db.save();
+  res.json({ user: publicUser(target) });
+});
+
 // ---------------------------------------------------------------------------
 // posts / likes / trending
 // ---------------------------------------------------------------------------
@@ -414,6 +441,11 @@ function serializePost(p, me) {
   const likeCount = db.data.likes.filter((l) => l.postId === p.id).length;
   const likedByMe = db.data.likes.some((l) => l.postId === p.id && l.userId === me.id);
   const commentCount = db.data.comments.filter((c) => c.postId === p.id).length;
+  const isMine = !!author && author.id === me.id;
+  const isMod = me.role === 'owner' || me.role === 'moderator';
+  // mods (and the owner) can remove posts from regular accounts only — never
+  // from each other, so moderation power can't be turned on other staff
+  const canModRemove = !isMine && isMod && !!author && author.role === 'user';
   return {
     id: p.id,
     text: p.text,
@@ -421,13 +453,14 @@ function serializePost(p, me) {
     editedAt: p.editedAt || null,
     media: p.mediaId ? { id: p.mediaId, type: p.mediaType } : null,
     author: author
-      ? { username: author.username, displayName: author.displayName, verified: !!author.verified, avatarUrl: author.avatarUrl || null }
-      : { username: 'deleted', displayName: 'deleted user', verified: false, avatarUrl: null },
+      ? { username: author.username, displayName: author.displayName, verified: !!author.verified, role: author.role, avatarUrl: author.avatarUrl || null }
+      : { username: 'deleted', displayName: 'deleted user', verified: false, role: 'user', avatarUrl: null },
     likeCount,
     likedByMe,
     commentCount,
     shareCount: p.shareCount || 0,
-    isMine: !!author && author.id === me.id,
+    isMine,
+    canModRemove,
   };
 }
 
@@ -482,7 +515,19 @@ app.delete('/api/posts/:id', requireAuth, async (req, res) => {
   const me = currentUser(req);
   const post = db.data.posts.find((p) => p.id === req.params.id);
   if (!post) return res.status(404).json({ error: 'post not found' });
-  if (post.userId !== me.id) return res.status(403).json({ error: 'you can only delete your own posts' });
+
+  const isOwnPost = post.userId === me.id;
+  if (!isOwnPost) {
+    const isMod = me.role === 'owner' || me.role === 'moderator';
+    if (!isMod) return res.status(403).json({ error: 'you can only delete your own posts' });
+    const author = db.data.users.find((u) => u.id === post.userId);
+    if (author && author.role !== 'user') {
+      return res.status(403).json({ error: "moderators can't remove another moderator's or the owner's posts" });
+    }
+    if (author) {
+      addNotification(author.id, 'mod_removed', me.id, 'A moderator removed one of your posts for violating community guidelines');
+    }
+  }
 
   db.data.posts = db.data.posts.filter((p) => p.id !== post.id);
   db.data.likes = db.data.likes.filter((l) => l.postId !== post.id);

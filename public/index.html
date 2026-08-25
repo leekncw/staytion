@@ -250,7 +250,7 @@
   .search-bar svg{ color:var(--text-faint); }
 
   /* composer */
-  .composer{ padding:18px 24px; border-bottom:8px solid var(--bg); display:flex; gap:12px; }
+  .composer{ padding:18px 24px; border-bottom:1px solid var(--border); display:flex; gap:12px; }
   .composer textarea{
     width:100%; display:block; box-sizing:border-box; resize:none; font-size:15px; line-height:1.5; min-height:44px; padding-top:8px;
   }
@@ -553,6 +553,9 @@
     color:var(--accent); border:1px solid var(--accent-dim); padding:1px 5px; margin-left:6px;
     vertical-align:middle; display:inline-block;
   }
+  .role-tag.banned-tag{ color:var(--error-red); border-color:var(--error-red); }
+  .ban-btn{ color:var(--error-red); border-color:var(--error-red); }
+  .ban-btn:hover{ background:var(--error-red); color:#fff; }
 
   /* ============ NEWS VIEW ============ */
   .news-composer{ padding:18px 24px; border-bottom:8px solid var(--bg); }
@@ -1156,9 +1159,22 @@ async function api(path, opts={}){
   if(!res.ok){
     const err = new Error(data.error || 'something went wrong');
     err.status = res.status;
+    err.code = data.code;
+    if(data.code === 'banned' && !opts.noBannedRedirect) forceBannedLogout();
     throw err;
   }
   return data;
+}
+let bannedLogoutHandled = false;
+function forceBannedLogout(){
+  if(bannedLogoutHandled) return;
+  bannedLogoutHandled = true;
+  if(socket){ socket.disconnect(); socket=null; }
+  me = null;
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('view-login').classList.remove('hidden');
+  alert('This account has been banned.');
 }
 
 /* =========================================================================
@@ -1240,7 +1256,7 @@ async function doLogin(){
   const password = document.getElementById('li-password').value;
   if(!username || !password){ showAuthError('login-error','enter a username and password'); return; }
   try{
-    const data = await api('/login', {method:'POST', body:{username, password}});
+    const data = await api('/login', {method:'POST', body:{username, password}, noBannedRedirect:true});
     me = data.user;
     enterApp();
   }catch(e){
@@ -1379,6 +1395,14 @@ function renderPostCard(p, scope){
             <div class="post-menu-dropdown hidden" id="post-menu-${key}">
               <button onclick="startEditPost('${scope}','${p.id}')">Edit</button>
               <button class="danger" onclick="deletePost('${scope}','${p.id}')">Delete</button>
+            </div>
+          </div>` : p.canModRemove ? `
+          <div class="post-menu-wrap">
+            <button class="post-menu-btn" onclick="togglePostMenu('${scope}','${p.id}')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+            </button>
+            <div class="post-menu-dropdown hidden" id="post-menu-${key}">
+              <button class="danger" onclick="deletePost('${scope}','${p.id}', true)">Remove Post (mod)</button>
             </div>
           </div>` : ''}
         </div>
@@ -1542,9 +1566,10 @@ async function saveEditPost(scope, postId){
     }
   }catch(e){ alert(e.message); }
 }
-async function deletePost(scope, postId){
+async function deletePost(scope, postId, isModRemoval){
   togglePostMenu(scope, postId);
-  if(!confirm('Delete this post? This can\'t be undone.')) return;
+  const msg = isModRemoval ? 'Remove this post from public view? This can\'t be undone.' : 'Delete this post? This can\'t be undone.';
+  if(!confirm(msg)) return;
   try{
     await api('/posts/'+postId, {method:'DELETE'});
     // remove every copy of this post from the page (it may be rendered in more
@@ -1951,6 +1976,7 @@ const notifIcons = {
   follow: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="4"/><path d="M2 21c1.2-3.6 4-5 7-5s5.8 1.4 7 5"/><path d="M19 8v6"/><path d="M16 11h6"/></svg>',
   verify: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>',
   comment: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',
+  mod_removed: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="M9.5 9.5l5 5M14.5 9.5l-5 5"/></svg>',
 };
 async function viewPostById(postId, commentId){
   goView('feed');
@@ -2023,7 +2049,7 @@ async function loadModTools(){
     <div class="mod-user-row">
       <div class="avatar" style="${avatarStyle(u,38)}font-size:13px;cursor:pointer;" onclick="openProfile('${u.username}')">${avatarText(u)}</div>
       <div class="mi">
-        <div class="mn">${esc(u.displayName)} ${verifiedBadge(u.verified)} ${u.role!=='user' ? `<span class="role-tag">${u.role==='owner'?'Owner':'Moderator'}</span>` : ''}</div>
+        <div class="mn">${esc(u.displayName)} ${verifiedBadge(u.verified)} ${u.role!=='user' ? `<span class="role-tag">${u.role==='owner'?'Owner':'Moderator'}</span>` : ''} ${u.banned ? `<span class="role-tag banned-tag">Banned</span>` : ''}</div>
         <div class="mh">@${u.username}</div>
         <div class="stats">${u.posts} posts · ${u.followers} followers</div>
       </div>
@@ -2032,6 +2058,7 @@ async function loadModTools(){
         <button class="btn-verify ${u.verified?'granted':''}" onclick="grantVerification('${u.username}', this)" ${u.verified?'disabled':''}>
           ${u.verified ? 'Verified' : 'Grant Verification'}
         </button>
+        ${u.role==='user' ? `<button class="btn-edit cut-sm ${u.banned?'':'ban-btn'}" onclick="toggleBanUser('${u.username}', ${!u.banned})">${u.banned?'Unban':'Ban'}</button>` : ''}
       </div>
     </div>`).join('') : `<div class="mod-user-row" style="color:var(--text-faint);">no other users yet.</div>`;
 }
@@ -2047,6 +2074,16 @@ async function grantVerification(username, btn){
 async function toggleModRole(username, role){
   try{
     await api('/users/'+username+'/role', {method:'PATCH', body:{role}});
+    loadModTools();
+  }catch(e){ alert(e.message); }
+}
+async function toggleBanUser(username, banned){
+  const msg = banned
+    ? `Ban @${username}? They'll be logged out immediately and won't be able to sign back in.`
+    : `Unban @${username}?`;
+  if(!confirm(msg)) return;
+  try{
+    await api('/users/'+username+'/ban', {method:'PATCH', body:{banned}});
     loadModTools();
   }catch(e){ alert(e.message); }
 }
