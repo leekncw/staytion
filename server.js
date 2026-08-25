@@ -66,6 +66,8 @@ function publicUser(u) {
     createdAt: u.createdAt,
     avatarUrl: u.avatarUrl || null,
     bannerUrl: u.bannerUrl || null,
+    audioId: u.profileAudioId || null,
+    audioName: u.profileAudioName || null,
     followers: db.data.follows.filter((f) => f.followeeId === u.id).length,
     following: db.data.follows.filter((f) => f.followerId === u.id).length,
     posts: db.data.posts.filter((p) => p.userId === u.id).length,
@@ -229,10 +231,11 @@ app.get('/api/users/:username/following', requireAuth, (req, res) => {
 });
 
 const MAX_IMAGE_DATA_URL_LENGTH = 3.5 * 1024 * 1024; // ~3.5MB of base64 text, plenty for a compressed jpeg
+const MAX_PROFILE_AUDIO_BYTES = 8 * 1024 * 1024; // 8MB, plenty for a short profile theme song
 
-app.patch('/api/me', requireAuth, (req, res) => {
+app.patch('/api/me', requireAuth, async (req, res) => {
   const me = currentUser(req);
-  const { displayName, bio, avatarUrl, bannerUrl } = req.body || {};
+  const { displayName, bio, avatarUrl, bannerUrl, audioDataUrl, audioFileName } = req.body || {};
   if (typeof displayName === 'string') me.displayName = displayName.trim() || me.username;
   if (typeof bio === 'string') me.bio = bio.slice(0, 280);
 
@@ -253,6 +256,31 @@ app.patch('/api/me', requireAuth, (req, res) => {
       return res.status(400).json({ error: 'that image is too large, try a smaller one' });
     }
     me.bannerUrl = bannerUrl || null;
+  }
+
+  if (typeof audioDataUrl !== 'undefined') {
+    // clear out whatever profile track is currently stored, if any
+    if (me.profileAudioId) {
+      db.data.mediaIndex = db.data.mediaIndex.filter((m) => m.id !== me.profileAudioId);
+      await db.deleteMediaBytes(me.profileAudioId);
+      me.profileAudioId = null;
+      me.profileAudioName = null;
+    }
+    if (audioDataUrl) {
+      const decoded = decodeDataUrl(audioDataUrl);
+      if (!decoded) return res.status(400).json({ error: 'that audio file looks corrupted, try a different one' });
+      if (!decoded.contentType.startsWith('audio/')) {
+        return res.status(400).json({ error: 'profile music must be an audio file' });
+      }
+      if (decoded.buffer.length > MAX_PROFILE_AUDIO_BYTES) {
+        return res.status(400).json({ error: 'that audio file is too large - try something under 8MB' });
+      }
+      const audioId = crypto.randomUUID();
+      db.data.mediaIndex.push({ id: audioId, contentType: decoded.contentType, ownerId: me.id, createdAt: Date.now() });
+      await db.saveMediaBytes(audioId, decoded.buffer);
+      me.profileAudioId = audioId;
+      me.profileAudioName = typeof audioFileName === 'string' ? audioFileName.slice(0, 120) : null;
+    }
   }
 
   db.save();
@@ -531,15 +559,40 @@ app.delete('/api/posts/:postId/comments/:commentId', requireAuth, (req, res) => 
   res.json({ ok: true, commentCount: db.data.comments.filter((c) => c.postId === req.params.postId).length });
 });
 
-// Serves the actual bytes for a post photo/video. Cached hard since a given
-// media id's content never changes once uploaded.
+// Serves the actual bytes for a post photo/video/profile audio track. Cached
+// hard since a given media id's content never changes once uploaded. Range
+// requests are supported since audio/video elements (esp. on iOS Safari)
+// commonly require them to play at all.
 app.get('/api/media/:id', requireAuth, async (req, res) => {
   const entry = db.data.mediaIndex.find((m) => m.id === req.params.id);
   if (!entry) return res.status(404).end();
   const buffer = await db.getMediaBytes(req.params.id);
   if (!buffer) return res.status(404).end();
-  res.set('Content-Type', entry.contentType);
+
   res.set('Cache-Control', 'private, max-age=31536000, immutable');
+  res.set('Accept-Ranges', 'bytes');
+
+  const range = req.headers.range;
+  if (range) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim());
+    if (match) {
+      let start = match[1] ? parseInt(match[1], 10) : 0;
+      let end = match[2] ? parseInt(match[2], 10) : buffer.length - 1;
+      if (Number.isNaN(start)) start = 0;
+      if (Number.isNaN(end) || end >= buffer.length) end = buffer.length - 1;
+      if (start > end || start >= buffer.length) {
+        res.set('Content-Range', `bytes */${buffer.length}`);
+        return res.status(416).end();
+      }
+      res.status(206);
+      res.set('Content-Range', `bytes ${start}-${end}/${buffer.length}`);
+      res.set('Content-Length', String(end - start + 1));
+      res.set('Content-Type', entry.contentType);
+      return res.end(buffer.slice(start, end + 1));
+    }
+  }
+
+  res.set('Content-Type', entry.contentType);
   res.send(buffer);
 });
 

@@ -516,6 +516,17 @@
   .btn-edit:hover{ border-color:var(--accent); color:var(--accent); }
   .profile-name{ font-family:var(--font-display); font-weight:700; font-size:21px; }
   .profile-handle{ color:var(--text-faint); font-family:var(--font-mono); font-size:13px; margin-top:2px; }
+  .profile-handle-row{ display:flex; align-items:center; gap:8px; }
+  .profile-audio-btn{
+    width:22px; height:22px; border-radius:50%; flex-shrink:0; margin-top:2px;
+    background:var(--surface); border:1px solid var(--border); color:var(--text-faint);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .profile-audio-btn:hover{ color:var(--text); }
+  .profile-audio-btn.playing{ color:var(--accent); border-color:var(--accent); }
+  .audio-upload-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .audio-upload-status{ font-size:13px; color:var(--text-dim); font-family:var(--font-mono); }
+  .audio-remove-btn{ color:var(--error-red); }
   .profile-bio{ font-size:14px; line-height:1.55; margin-top:12px; max-width:480px; }
   .profile-stats{ display:flex; gap:22px; margin-top:14px; }
   .profile-stats b{ font-size:14px; }
@@ -963,6 +974,7 @@
     <div class="view hidden" id="v-profile">
       <input type="file" id="banner-file-input" accept="image/*" class="hidden" onchange="handleBannerFile(event)">
       <input type="file" id="avatar-file-input" accept="image/*" class="hidden" onchange="handleAvatarFile(event)">
+      <input type="file" id="audio-file-input" accept="audio/*" class="hidden" onchange="handleAudioFile(event)">
       <div class="banner" id="profile-banner" style="background:linear-gradient(120deg,#4a4a4d 0%, #232326 45%, #0a0a0b 100%);position:relative;">
         <div class="banner-edit-hint hidden" id="banner-edit-hint" onclick="triggerBannerUpload()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
@@ -981,7 +993,12 @@
             <button class="btn-edit cut-sm" onclick="openEditProfile()">Edit Profile</button>
           </div>
         </div>
-        <div class="profile-handle" id="profile-handle-line"></div>
+        <div class="profile-handle-row">
+          <div class="profile-handle" id="profile-handle-line"></div>
+          <button class="profile-audio-btn hidden" id="profile-audio-btn" onclick="toggleProfileAudioPlayback()" title="profile music">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          </button>
+        </div>
         <div class="profile-bio" id="profile-bio-line"></div>
 
         <div id="profile-edit-form" class="hidden" style="margin-top:14px;max-width:420px;">
@@ -992,6 +1009,15 @@
           <div class="field">
             <label>Bio</label>
             <div class="input-box"><input id="edit-bio" type="text" maxlength="280"></div>
+          </div>
+          <div class="field">
+            <label>Profile Music</label>
+            <div class="audio-upload-row">
+              <div class="audio-upload-status" id="audio-upload-status">no music set</div>
+              <button type="button" class="btn-edit cut-sm" onclick="document.getElementById('audio-file-input').click()">Upload MP3</button>
+              <button type="button" class="btn-edit cut-sm audio-remove-btn hidden" id="audio-remove-btn" onclick="removeProfileAudio()">Remove</button>
+            </div>
+            <div class="field-hint">plays automatically when someone opens your profile · up to 8MB</div>
           </div>
           <div style="display:flex;gap:10px;">
             <button class="btn-post" onclick="saveProfileEdits()">Save</button>
@@ -1304,6 +1330,7 @@ function connectSocket(){
    NAV
    ========================================================================= */
 function goView(name){
+  if(name !== 'profile') stopProfileAudio();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
   ['feed','search','messages','news','notifications','modtools','settings','profile'].forEach(v=>{
     document.getElementById('v-'+v).classList.toggle('hidden', v!==name);
@@ -2031,7 +2058,50 @@ let profileRequestToken = 0;
 let profileAllPostsCache = []; // this profile owner's posts, cached so tab switches don't refetch
 let currentProfileTab = 'posts'; // 'posts' | 'media' | 'likes'
 
+/* =========================================================================
+   PROFILE MUSIC PLAYBACK
+   ========================================================================= */
+let profileAudioEl = null;
+function getProfileAudioEl(){
+  if(!profileAudioEl){
+    profileAudioEl = new Audio();
+    profileAudioEl.loop = true;
+    profileAudioEl.volume = 0.85;
+    profileAudioEl.addEventListener('play', ()=>{
+      const btn = document.getElementById('profile-audio-btn');
+      if(btn) btn.classList.add('playing');
+    });
+    profileAudioEl.addEventListener('pause', ()=>{
+      const btn = document.getElementById('profile-audio-btn');
+      if(btn) btn.classList.remove('playing');
+    });
+  }
+  return profileAudioEl;
+}
+function playProfileAudio(audioId){
+  if(!audioId) return;
+  const el = getProfileAudioEl();
+  el.src = '/api/media/'+audioId;
+  el.currentTime = 0;
+  const playPromise = el.play();
+  if(playPromise && playPromise.catch){
+    playPromise.catch(()=>{}); // autoplay blocked - the music-note button still lets them start it manually
+  }
+}
+function stopProfileAudio(){
+  if(profileAudioEl){
+    profileAudioEl.pause();
+    profileAudioEl.currentTime = 0;
+  }
+}
+function toggleProfileAudioPlayback(){
+  const el = getProfileAudioEl();
+  if(!el.src) return;
+  if(el.paused){ el.play().catch(()=>{}); } else { el.pause(); }
+}
+
 async function openProfile(username){
+  stopProfileAudio(); // silence whatever profile track was playing before we switch
   goViewOnlyProfile();
   viewingUsername = username;
   const myToken = ++profileRequestToken;
@@ -2039,6 +2109,14 @@ async function openProfile(username){
   const data = await api('/users/'+username);
   if(myToken !== profileRequestToken) return; // a newer profile click superseded this one — don't render stale data
   const u = data.user;
+
+  const audioBtn = document.getElementById('profile-audio-btn');
+  if(u.audioId){
+    audioBtn.classList.remove('hidden');
+    playProfileAudio(u.audioId);
+  } else {
+    audioBtn.classList.add('hidden');
+  }
 
   const avatarEl = document.getElementById('profile-avatar');
   avatarEl.setAttribute('style', avatarStyle(u, 104) + 'position:relative;');
@@ -2223,7 +2301,10 @@ function openCropper(img, opts){
     imgEl.src = img.src;
     zoomSlider.value = 100;
 
-    // wait a frame so the stage has its final on-screen size before measuring
+    // show the modal FIRST so the stage has a real on-screen size to measure —
+    // measuring while it's still display:none returns a 0x0 rect
+    document.getElementById('crop-modal').classList.remove('hidden');
+
     requestAnimationFrame(()=>{
       const rect = stage.getBoundingClientRect();
       const containerW = rect.width, containerH = rect.height;
@@ -2236,7 +2317,6 @@ function openCropper(img, opts){
         dragging: false, startPointerX:0, startPointerY:0, startOffsetX:0, startOffsetY:0,
       };
       applyCropTransform();
-      document.getElementById('crop-modal').classList.remove('hidden');
     });
   });
 }
@@ -2469,6 +2549,7 @@ async function savePassword(){
 function openEditProfile(){
   document.getElementById('edit-display-name').value = me.displayName;
   document.getElementById('edit-bio').value = me.bio || '';
+  updateAudioEditUI();
   document.getElementById('profile-edit-form').classList.remove('hidden');
 }
 function closeEditProfile(){
@@ -2483,6 +2564,53 @@ async function saveProfileEdits(){
     document.getElementById('me-name').innerHTML = esc(me.displayName) + ' ' + (me.role!=='user' ? `<span class="role-tag">${me.role==='owner'?'Owner':'Moderator'}</span>` : '');
     closeEditProfile();
     openProfile(me.username);
+  }catch(e){ alert(e.message); }
+}
+
+function updateAudioEditUI(){
+  const status = document.getElementById('audio-upload-status');
+  const removeBtn = document.getElementById('audio-remove-btn');
+  if(me.audioId){
+    status.textContent = '🎵 ' + (me.audioName || 'profile-music.mp3');
+    removeBtn.classList.remove('hidden');
+  } else {
+    status.textContent = 'no music set';
+    removeBtn.classList.add('hidden');
+  }
+}
+async function handleAudioFile(event){
+  const file = event.target.files[0];
+  event.target.value = '';
+  if(!file) return;
+  if(!file.type.startsWith('audio/')){ alert('please choose an audio file'); return; }
+  const MAX_BYTES = 8 * 1024 * 1024;
+  if(file.size > MAX_BYTES){ alert('that audio file is too large - try something under 8MB'); return; }
+  try{
+    const dataUrl = await new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onerror = ()=>reject(new Error('could not read that file'));
+      reader.onload = ()=>resolve(reader.result);
+      reader.readAsDataURL(file);
+    });
+    const data = await api('/me', {method:'PATCH', body:{audioDataUrl: dataUrl, audioFileName: file.name}});
+    me = data.user;
+    updateAudioEditUI();
+    if(viewingUsername === me.username){
+      document.getElementById('profile-audio-btn').classList.remove('hidden');
+      playProfileAudio(me.audioId);
+    }
+  }catch(e){ alert(e.message); }
+}
+async function removeProfileAudio(){
+  if(!confirm("Remove your profile music?")) return;
+  try{
+    const data = await api('/me', {method:'PATCH', body:{audioDataUrl: null}});
+    me = data.user;
+    updateAudioEditUI();
+    if(viewingUsername === me.username){
+      stopProfileAudio();
+      document.getElementById('profile-audio-btn').classList.add('hidden');
+    }
   }catch(e){ alert(e.message); }
 }
 
