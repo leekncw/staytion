@@ -167,10 +167,11 @@ app.get('/api/me', (req, res) => {
 
 app.get('/api/users/search', requireAuth, (req, res) => {
   const q = String(req.query.q || '').toLowerCase().trim();
+  const me = currentUser(req);
   const results = db.data.users
     .filter((u) => !q || u.username.includes(q) || (u.displayName || '').toLowerCase().includes(q))
     .slice(0, 30)
-    .map(publicUser);
+    .map((u) => serializeUserForList(u, me));
   res.json({ users: results });
 });
 
